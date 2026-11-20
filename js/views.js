@@ -19,6 +19,31 @@ export function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+export function buildTokenUrl(owner, readOnly = true) {
+  const p = new URLSearchParams({
+    name: readOnly ? 'ItemVault (read-only search)' : 'ItemVault (this device)',
+    description: readOnly
+      ? 'Read-only search access to the personal inventory repository.'
+      : 'Read and write access to the personal inventory repository.',
+    expires_in: '366',
+    contents: readOnly ? 'read' : 'write',
+  });
+  if (owner) p.set('target_name', owner);
+  return `https://github.com/settings/personal-access-tokens/new?${p}`;
+}
+
+export function renderSyncBadge(store) {
+  if (store.mode === 'demo') return '<span class="sync-pill demo">演示模式</span>';
+  if (store.syncState === 'syncing') return '<span class="sync-pill syncing">同步中…</span>';
+  if (store.syncState === 'error') {
+    const label = store.outbox.length > 0 ? `同步异常 (${store.outbox.length})` : '同步异常';
+    return `<button class="sync-pill err" data-act="open-settings">${label}</button>`;
+  }
+  if (store.outbox.length > 0) return `<button class="sync-pill offline" data-act="sync-now">待同步 ${store.outbox.length}</button>`;
+  if (store.syncState === 'offline') return `<button class="sync-pill offline" data-act="sync-now">${store.isReadOnly ? '只读离线' : '离线'}</button>`;
+  return `<button class="sync-pill ok" data-act="sync-now">${store.isReadOnly ? '只读已同步' : '已同步'}</button>`;
+}
+
 export function toast(msg) {
   const el = document.getElementById('toast');
   if (!el) return;
@@ -54,6 +79,7 @@ function badgesFor(it, today) {
 }
 
 export function renderItemCard(it, today, opts = {}) {
+  const readOnly = Boolean(opts.readOnly);
   const away = it.home_location && it.current_location && it.home_location !== it.current_location;
   const loc = it.current_location || it.home_location || '未填位置';
   const qtyText = `${it.qty ?? 0}${it.unit || '件'}`;
@@ -80,6 +106,7 @@ export function renderItemCard(it, today, opts = {}) {
       ${it.desc ? `<div class="card-desc">${esc(it.desc)}</div>` : ''}
       ${nbLine}
       ${extraLine}
+      ${readOnly ? '' : `
       <div class="card-actions">
         <button class="btn-chip" data-act="open-move" data-id="${esc(it.id)}">换位置</button>
         ${away ? `<button class="btn-chip btn-accent" data-act="return-home" data-id="${esc(it.id)}">归位</button>` : ''}
@@ -90,12 +117,13 @@ export function renderItemCard(it, today, opts = {}) {
           : `<button class="btn-chip ${it.need_buy ? 'btn-active' : ''}" data-act="toggle-buy" data-id="${esc(it.id)}">${it.need_buy ? '取消待买' : '加采购'}</button>`}
         ${nb ? `<button class="btn-chip" data-act="toggle-enotes" data-id="${esc(it.id)}">${nb.archived_to_enotes ? '标未归档' : '已归档e-notes'}</button>` : ''}
         ${opts.showVerify ? `<button class="btn-chip btn-accent" data-act="verify" data-id="${esc(it.id)}">核实位置</button>` : ''}
-      </div>
+      </div>`}
     </article>`;
 }
 
 export function renderSearchView(store, ui) {
   const today = todayISO();
+  const readOnly = Boolean(store.isReadOnly);
   const active = getActiveItems(store.state.itemsDoc.items);
   const filters = [
     { id: 'all', label: `全部 (${active.length})` },
@@ -133,16 +161,17 @@ export function renderSearchView(store, ui) {
         ${filters.map((x) => `<button class="filter-chip ${f === x.id ? 'active' : ''}" data-act="set-filter" data-filter="${x.id}">${esc(x.label)}</button>`).join('')}
       </div>
       ${filtered.length
-        ? `<div class="card-list">${filtered.map(({ it }) => renderItemCard(it, today)).join('')}</div>`
+        ? `<div class="card-list">${filtered.map(({ it }) => renderItemCard(it, today, { readOnly })).join('')}</div>`
         : `<div class="empty-box">
              <p>${active.length ? `没有找到匹配「${esc(q)}」的物品` : '物品库还是空的'}</p>
-             <button class="btn-primary" data-act="open-add">+ 录入第一件物品</button>
+             ${readOnly ? '' : '<button class="btn-primary" data-act="open-add">+ 录入第一件物品</button>'}
            </div>`}
     </section>`;
 }
 
 export function renderExpiringView(store) {
   const today = todayISO();
+  const readOnly = Boolean(store.isReadOnly);
   const list = getExpiringItems(store.state.itemsDoc.items, today);
   return `
     <section class="panel">
@@ -154,7 +183,7 @@ export function renderExpiringView(store) {
         ? `<div class="card-list">${list.map(({ item, daysLeft }) => {
             const note = daysLeft < 0 ? `已超出目标日期 ${-daysLeft} 天（${item.use_by}）`
               : (daysLeft === 0 ? `今天是目标期限（${item.use_by}）` : `距离目标期限 ${item.use_by} 还有 ${daysLeft} 天`);
-            return renderItemCard(item, today, { extraNote: note });
+            return renderItemCard(item, today, { extraNote: note, readOnly });
           }).join('')}</div>`
         : '<div class="empty-box"><p>暂无设置限期用完（use_by）的物品。</p></div>'}
     </section>`;
@@ -162,6 +191,7 @@ export function renderExpiringView(store) {
 
 export function renderIdleView(store) {
   const today = todayISO();
+  const readOnly = Boolean(store.isReadOnly);
   const { unopened, idle, unverified } = getIdleRadar(store.state.itemsDoc.items, today);
   return `
     <section class="panel">
@@ -171,23 +201,24 @@ export function renderIdleView(store) {
       </div>
       <h3 class="subhead">未拆封 / 未使用囤货（${unopened.length}）</h3>
       ${unopened.length
-        ? `<div class="card-list">${unopened.map((it) => renderItemCard(it, today, { extraNote: `未拆封 ${it.unopened_qty || it.qty}${it.unit || '件'}，优先消耗` })).join('')}</div>`
+        ? `<div class="card-list">${unopened.map((it) => renderItemCard(it, today, { extraNote: `未拆封 ${it.unopened_qty || it.qty}${it.unit || '件'}，优先消耗`, readOnly })).join('')}</div>`
         : '<p class="muted-empty">暂无未拆封囤货。</p>'}
 
       <h3 class="subhead">超期吃灰（${idle.length}）</h3>
       ${idle.length
-        ? `<div class="card-list">${idle.map(({ item, idleDays }) => renderItemCard(item, today, { extraNote: `已 ${idleDays} 天未记录使用` })).join('')}</div>`
+        ? `<div class="card-list">${idle.map(({ item, idleDays }) => renderItemCard(item, today, { extraNote: `已 ${idleDays} 天未记录使用`, readOnly })).join('')}</div>`
         : '<p class="muted-empty">暂无超期吃灰物品。</p>'}
 
       <h3 class="subhead">超 180 天未核实位置（${unverified.length}）</h3>
       ${unverified.length
-        ? `<div class="card-list">${unverified.map(({ item, days }) => renderItemCard(item, today, { extraNote: `上次核实位置已过去 ${days} 天`, showVerify: true })).join('')}</div>`
+        ? `<div class="card-list">${unverified.map(({ item, days }) => renderItemCard(item, today, { extraNote: `上次核实位置已过去 ${days} 天`, showVerify: true, readOnly })).join('')}</div>`
         : '<p class="muted-empty">所有物品位置均在 180 天内核实过。</p>'}
     </section>`;
 }
 
 export function renderBuyView(store) {
   const today = todayISO();
+  const readOnly = Boolean(store.isReadOnly);
   const list = getToBuyItems(store.state.itemsDoc.items);
   return `
     <section class="panel">
@@ -201,7 +232,7 @@ export function renderBuyView(store) {
             if (it.remind_buy_on) parts.push(`提醒购买日：${it.remind_buy_on}`);
             if (it.buy_note) parts.push(`备注：${it.buy_note}`);
             if ((it.unopened_qty || 0) > 0) parts.push(`注意：库中还有 ${it.unopened_qty} 件未拆封`);
-            return renderItemCard(it, today, { extraNote: parts.join(' | '), showBought: true });
+            return renderItemCard(it, today, { extraNote: parts.join(' | '), showBought: true, readOnly });
           }).join('')}</div>`
         : '<div class="empty-box"><p>当前没有待采购或低库存物品。</p></div>'}
     </section>`;
@@ -209,6 +240,7 @@ export function renderBuyView(store) {
 
 export function renderMapView(store, locCode = '') {
   const today = todayISO();
+  const readOnly = Boolean(store.isReadOnly);
   const items = store.state.itemsDoc.items;
   const groups = getContainerGroups(items, store.state.locsDoc.locations);
 
@@ -220,11 +252,11 @@ export function renderMapView(store, locCode = '') {
       <section class="panel">
         <div class="loc-detail-head">
           <button class="btn-chip" data-act="go-map">← 返回容器地图</button>
-          <button class="btn-chip btn-accent" data-act="verify-container" data-code="${esc(code)}">整格核实 (${matched.length}件)</button>
+          ${readOnly ? '' : `<button class="btn-chip btn-accent" data-act="verify-container" data-code="${esc(code)}">整格核实 (${matched.length}件)</button>`}
         </div>
         <h2 class="loc-detail-title">[${esc(code)}] ${esc(grp?.label || code)}</h2>
         ${matched.length
-          ? `<div class="card-list">${matched.map((it) => renderItemCard(it, today)).join('')}</div>`
+          ? `<div class="card-list">${matched.map((it) => renderItemCard(it, today, { readOnly })).join('')}</div>`
           : '<div class="empty-box"><p>该容器内当前没有物品。</p></div>'}
       </section>`;
   }
@@ -237,7 +269,7 @@ export function renderMapView(store, locCode = '') {
         <span class="muted">记录书脊号、封面、主题与电子化归档状态</span>
       </div>
       ${nbs.length
-        ? `<div class="card-list">${nbs.map((it) => renderItemCard(it, today)).join('')}</div>`
+        ? `<div class="card-list">${nbs.map((it) => renderItemCard(it, today, { readOnly })).join('')}</div>`
         : '<p class="muted-empty">暂无录入的实体本子。</p>'}
 
       <div class="sec-head" style="margin-top:20px;">
@@ -276,8 +308,8 @@ export function renderQuickAddModal(store, state) {
     : '';
 
   return `
-    <div class="modal-backdrop" data-act="close-modal">
-      <div class="modal" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
+    <div class="modal-backdrop" data-act="close-backdrop">
+      <div class="modal" role="dialog" aria-modal="true">
         <div class="modal-head">
           <h3>极简录入</h3>
           <button class="icon-btn" data-act="close-modal">✕</button>
@@ -360,8 +392,8 @@ export function renderMoveModal(store, itemId) {
   if (!it) return '';
   const spots = [...new Set([...(it.quick_spots || []), it.home_location, ...(store.state.locsDoc.locations || []).map((l) => l.label)].filter(Boolean))];
   return `
-    <div class="modal-backdrop" data-act="close-modal">
-      <div class="modal" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
+    <div class="modal-backdrop" data-act="close-backdrop">
+      <div class="modal" role="dialog" aria-modal="true">
         <div class="modal-head">
           <h3>移位：${esc(it.name)}</h3>
           <button class="icon-btn" data-act="close-modal">✕</button>
@@ -390,8 +422,8 @@ export function renderEditModal(store, itemId) {
   if (!it) return '';
   const nb = it.notebook_meta || {};
   return `
-    <div class="modal-backdrop" data-act="close-modal">
-      <div class="modal modal-tall" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
+    <div class="modal-backdrop" data-act="close-backdrop">
+      <div class="modal modal-tall" role="dialog" aria-modal="true">
         <div class="modal-head">
           <h3>编辑 ${esc(it.id)}</h3>
           <button class="icon-btn" data-act="close-modal">✕</button>
@@ -451,20 +483,76 @@ export function renderEditModal(store, itemId) {
     </div>`;
 }
 
-export function renderSettingsModal(store) {
-  const cfg = store.config || { owner: 'crtwmv2f9v-spec', repo: 'item-vault-data', branch: 'main', token: '' };
+export function renderDetailModal(store, itemId) {
+  const it = store.state.itemsDoc.items.find((x) => x.id === itemId);
+  if (!it) return '';
+  const nb = it.notebook_meta;
+  const rows = [
+    ['编号', it.id],
+    ['数量', `${it.qty ?? 0}${it.unit || '件'}${(it.unopened_qty || 0) > 0 ? `（未拆 ${it.unopened_qty}）` : ''}`],
+    ['类型 / 分类', `${TYPE_LABELS[it.item_type] || it.item_type || ''} · ${[it.domain, it.category].filter(Boolean).join(' / ')}`],
+    ['当前位置', it.current_location || '未填'],
+    ['常驻位置', it.home_location || '未填'],
+    it.aliases?.length ? ['别名', it.aliases.join('、')] : null,
+    it.desc ? ['描述', it.desc] : null,
+    it.use_by ? ['限期用完', it.use_by] : null,
+    it.remind_use_on ? ['提醒使用', it.remind_use_on] : null,
+    it.need_buy ? ['采购状态', `待买${it.remind_buy_on ? `（提醒日 ${it.remind_buy_on}）` : ''}${it.buy_note ? ` · ${it.buy_note}` : ''}`] : null,
+    it.last_used_at ? ['最近使用', it.last_used_at] : null,
+    it.verified_at ? ['最近核实', it.verified_at] : null,
+  ].filter(Boolean);
+
   return `
-    <div class="modal-backdrop" data-act="close-modal">
-      <div class="modal" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
+    <div class="modal-backdrop" data-act="close-backdrop">
+      <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal-head">
+          <h3>${esc(it.name)}</h3>
+          <button class="icon-btn" data-act="close-modal">✕</button>
+        </div>
+        <div class="detail-grid">
+          ${rows.map(([k, v]) => `<div class="detail-row"><span class="detail-k">${esc(k)}</span><span class="detail-v">${esc(v)}</span></div>`).join('')}
+        </div>
+        ${nb ? `
+          <div class="nb-section" style="margin-top:10px;">
+            <div><strong>实体本子 ${esc(nb.code || '')}</strong> · ${nb.archived_to_enotes ? '已归档至 e-notes' : '未电子化'}</div>
+            ${nb.cover ? `<div class="muted">封面：${esc(nb.cover)}</div>` : ''}
+            ${nb.topics?.length ? `<div class="muted">主题：${esc(nb.topics.join('、'))}</div>` : ''}
+            ${nb.contents_summary ? `<div>${esc(nb.contents_summary)}</div>` : ''}
+          </div>` : ''}
+        <p class="muted" style="margin:12px 0 0;">当前为只读搜索模式，如需修改请在聊天中直接更新或在设置里关闭只读。</p>
+        <div class="modal-foot">
+          <button type="button" class="btn-primary" data-act="close-modal">关闭</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+export function renderSettingsModal(store) {
+  const cfg = store.config || { owner: 'crtwmv2f9v-spec', repo: 'item-vault-data', branch: 'main', token: '', readOnly: false };
+  const modeLabel = store.mode === 'github'
+    ? (store.isReadOnly ? '私有 GitHub 仓库（只读搜索）' : '私有 GitHub 仓库（可读写）')
+    : '本地演示模式';
+  const roUrl = buildTokenUrl(cfg.owner, true);
+  const rwUrl = buildTokenUrl(cfg.owner, false);
+  return `
+    <div class="modal-backdrop" data-act="close-backdrop">
+      <div class="modal" role="dialog" aria-modal="true">
         <div class="modal-head">
           <h3>同步与仓库设置</h3>
           <button class="icon-btn" data-act="close-modal">✕</button>
         </div>
         <div class="status-box">
-          <div>模式：<b>${store.mode === 'github' ? '私有 GitHub 仓库' : '本地演示模式'}</b></div>
-          <div>离线队列：<b>${store.outbox.length} 条待同步</b></div>
+          <div>模式：<b>${modeLabel}</b></div>
+          ${store.isReadOnly
+            ? '<div>权限：<b>只读搜索（新增与修改请从电脑端同步）</b></div>'
+            : `<div>离线队列：<b>${store.outbox.length} 条待同步</b></div>`}
           ${store.lastSyncedAt ? `<div>上次同步：${esc(store.lastSyncedAt.replace('T', ' ').slice(0, 19))}</div>` : ''}
           ${store.lastError ? `<div class="err-line">${esc(store.lastError)}</div>` : ''}
+          ${store.mode === 'github' && store.outbox.length > 0 ? `
+            <div class="status-actions">
+              ${store.lastErrorCode === 403 ? '<button type="button" class="btn-chip btn-accent" data-act="switch-readonly">切为只读模式并拉取最新</button>' : ''}
+              <button type="button" class="btn-chip" data-act="discard-outbox">放弃待同步并拉取最新</button>
+            </div>` : ''}
         </div>
         <form id="settings-form" class="form-stack">
           <div class="row-2">
@@ -473,6 +561,16 @@ export function renderSettingsModal(store) {
           </div>
           <label>Fine-grained Token（仅授权该私有仓 Contents：只搜选 Read-only，需手机端修改选 Read &amp; Write）
             <input name="token" type="password" value="${esc(cfg.token || '')}" placeholder="github_pat_..." required />
+          </label>
+          <div class="token-links">
+            <span>一键前往 GitHub 创建（选 Only select repositories → <code>${esc(cfg.repo)}</code>）：</span>
+            <a href="${esc(roUrl)}" target="_blank" rel="noopener noreferrer">创建只读 Token</a>
+            <span>·</span>
+            <a href="${esc(rwUrl)}" target="_blank" rel="noopener noreferrer">创建读写 Token</a>
+          </div>
+          <label class="chk-row">
+            <input type="checkbox" name="read_only" ${cfg.readOnly ? 'checked' : ''} />
+            只读搜索模式（隐藏修改按钮，防误点，搭配 Read-only Token）
           </label>
           <div class="modal-foot space-between">
             <button type="button" class="btn-chip" data-act="export-json">导出 JSON</button>

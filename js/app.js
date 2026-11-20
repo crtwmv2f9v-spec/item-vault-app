@@ -6,6 +6,7 @@ import { VaultStore } from './store.js';
 import {
   esc,
   renderBuyView,
+  renderDetailModal,
   renderEditModal,
   renderExpiringView,
   renderIdleView,
@@ -14,6 +15,7 @@ import {
   renderQuickAddModal,
   renderSearchView,
   renderSettingsModal,
+  renderSyncBadge,
   toast,
 } from './views.js';
 
@@ -48,13 +50,15 @@ function parseHash() {
   }
 }
 
-function syncBadge() {
-  if (store.mode === 'demo') return '<span class="sync-pill demo">演示模式</span>';
-  if (store.syncState === 'syncing') return '<span class="sync-pill syncing">同步中…</span>';
-  if (store.outbox.length > 0) return `<button class="sync-pill offline" data-act="sync-now">待同步 ${store.outbox.length}</button>`;
-  if (store.syncState === 'offline') return '<button class="sync-pill offline" data-act="sync-now">离线</button>';
-  if (store.syncState === 'error') return '<button class="sync-pill err" data-act="open-settings">同步异常</button>';
-  return '<button class="sync-pill ok" data-act="sync-now">已同步</button>';
+async function runMutation(type, payload, okMsg) {
+  const op = await store.dispatch(type, payload);
+  if (!op) {
+    render();
+    toast('当前为只读搜索模式（如需修改请在设置里关闭只读）');
+    return false;
+  }
+  toast(okMsg);
+  return true;
 }
 
 function render() {
@@ -80,10 +84,11 @@ function render() {
   else if (ui.route === 'map') mainHtml = renderMapView(store, ui.locCode);
 
   let modalHtml = '';
-  if (ui.modal?.kind === 'add') modalHtml = renderQuickAddModal(store, ui);
-  else if (ui.modal?.kind === 'move') modalHtml = renderMoveModal(store, ui.modal.id);
-  else if (ui.modal?.kind === 'edit') modalHtml = renderEditModal(store, ui.modal.id);
-  else if (ui.modal?.kind === 'settings') modalHtml = renderSettingsModal(store);
+  if (ui.modal?.kind === 'add' && !store.isReadOnly) modalHtml = renderQuickAddModal(store, ui);
+  else if (ui.modal?.kind === 'move' && !store.isReadOnly) modalHtml = renderMoveModal(store, ui.modal.id);
+  else if (ui.modal?.kind === 'edit') {
+    modalHtml = store.isReadOnly ? renderDetailModal(store, ui.modal.id) : renderEditModal(store, ui.modal.id);
+  } else if (ui.modal?.kind === 'settings') modalHtml = renderSettingsModal(store);
 
   const tabs = [
     { id: 'search', label: '秒搜', count: 0 },
@@ -100,8 +105,8 @@ function render() {
         <h1>物品库</h1>
       </div>
       <div class="top-right">
-        ${syncBadge()}
-        <button class="btn-add" data-act="open-add">+ 录入</button>
+        ${renderSyncBadge(store)}
+        ${store.isReadOnly ? '' : '<button class="btn-add" data-act="open-add">+ 录入</button>'}
         <button class="icon-btn" data-act="open-settings" aria-label="设置">⚙</button>
       </div>
     </header>
@@ -158,6 +163,7 @@ document.addEventListener('click', async (e) => {
     ui.searchQuery = '';
     render();
   } else if (act === 'open-add') {
+    if (store.isReadOnly) { toast('当前为只读搜索模式'); return; }
     ui.modal = { kind: 'add' };
     ui.quickText = '';
     ui.formName = '';
@@ -166,44 +172,36 @@ document.addEventListener('click', async (e) => {
     ui.addTab = btn.dataset.tab;
     render();
   } else if (act === 'open-move') {
+    if (store.isReadOnly) { toast('当前为只读搜索模式'); return; }
     ui.modal = { kind: 'move', id };
     render();
   } else if (act === 'do-move') {
     ui.modal = null;
-    await store.dispatch('move_item', { id, location: btn.dataset.loc });
-    toast('位置已更新');
+    await runMutation('move_item', { id, location: btn.dataset.loc }, '位置已更新');
   } else if (act === 'return-home') {
-    await store.dispatch('return_home', { id });
-    toast('已归位');
+    await runMutation('return_home', { id }, '已归位');
   } else if (act === 'dec') {
-    await store.dispatch('qty_delta', { id, delta: -1 });
-    toast('数量 -1');
+    await runMutation('qty_delta', { id, delta: -1 }, '数量 -1');
   } else if (act === 'use') {
-    await store.dispatch('mark_used', { id });
-    toast('已记录使用');
+    await runMutation('mark_used', { id }, '已记录使用');
   } else if (act === 'verify') {
-    await store.dispatch('verify_item', { id });
-    toast('位置已核实');
+    await runMutation('verify_item', { id }, '位置已核实');
   } else if (act === 'verify-container') {
-    await store.dispatch('verify_container', { code: btn.dataset.code });
-    toast(`容器 ${btn.dataset.code} 已整格核实`);
+    await runMutation('verify_container', { code: btn.dataset.code }, `容器 ${btn.dataset.code} 已整格核实`);
   } else if (act === 'toggle-buy') {
-    await store.dispatch('toggle_buy', { id });
-    toast('已更新采购清单');
+    await runMutation('toggle_buy', { id }, '已更新采购清单');
   } else if (act === 'bought') {
-    await store.dispatch('mark_bought', { id, qty: 1 });
-    toast('已入库并移出采购清单');
+    await runMutation('mark_bought', { id, qty: 1 }, '已入库并移出采购清单');
   } else if (act === 'toggle-enotes') {
-    await store.dispatch('toggle_archived_enotes', { id });
-    toast('已更新电子化状态');
+    await runMutation('toggle_archived_enotes', { id }, '已更新电子化状态');
   } else if (act === 'open-edit') {
     ui.modal = { kind: 'edit', id };
     render();
   } else if (act === 'retire-item') {
+    if (store.isReadOnly) { toast('当前为只读搜索模式'); return; }
     if (confirm('确定将此物品归档停用？')) {
       ui.modal = null;
-      await store.dispatch('retire_item', { id });
-      toast('已归档停用');
+      await runMutation('retire_item', { id }, '已归档停用');
     }
   } else if (act === 'open-loc') {
     location.hash = `#/loc/${encodeURIComponent(btn.dataset.code)}`;
@@ -216,7 +214,27 @@ document.addEventListener('click', async (e) => {
     render();
   } else if (act === 'sync-now') {
     await store.sync();
-    toast(store.outbox.length ? '当前离线，已保存在本地队列' : '同步完成');
+    if (store.syncState === 'error') {
+      toast(`同步失败：${store.lastError || '请点右上角设置检查'}`);
+    } else if (store.syncState === 'offline' || store.outbox.length) {
+      toast('当前离线，已保存在本地队列');
+    } else {
+      toast('同步完成');
+    }
+  } else if (act === 'discard-outbox') {
+    if (confirm('放弃本地未同步的修改，并从私有仓拉取最新数据？')) {
+      await store.discardOutboxAndSync();
+      if (store.syncState !== 'error') {
+        ui.modal = null;
+        render();
+      }
+      toast(store.syncState === 'error' ? `拉取失败：${store.lastError}` : '已放弃未同步修改并拉取最新');
+    }
+  } else if (act === 'switch-readonly') {
+    await store.setReadOnly(true);
+    ui.modal = null;
+    render();
+    toast(store.syncState === 'error' ? `已切为只读模式，拉取失败：${store.lastError}` : '已切为只读搜索模式并拉取最新');
   } else if (act === 'export-json') {
     const blob = new Blob([JSON.stringify(store.state.itemsDoc, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -227,7 +245,13 @@ document.addEventListener('click', async (e) => {
   } else if (act === 'use-demo') {
     await store.switchDemo();
     ui.modal = null;
+    render();
     toast('已切换至本地演示模式');
+  } else if (act === 'close-backdrop') {
+    if (e.target === btn) {
+      ui.modal = null;
+      render();
+    }
   } else if (act === 'close-modal') {
     ui.modal = null;
     render();
@@ -254,8 +278,7 @@ document.addEventListener('submit', async (e) => {
     const parsed = parseQuickText(ui.quickText);
     if (!parsed || !parsed.name) { toast('请输入物品信息'); return; }
     ui.modal = null;
-    await store.dispatch('add_item', parsed);
-    toast(`已入库：${parsed.name}`);
+    await runMutation('add_item', parsed, `已入库：${parsed.name}`);
   } else if (form.id === 'form-add-form') {
     const fd = new FormData(form);
     const type = fd.get('item_type') || 'durable';
@@ -277,14 +300,12 @@ document.addEventListener('submit', async (e) => {
       notebook_meta: type === 'notebook' ? { topics: fd.get('nb_topics') || '' } : null,
     };
     ui.modal = null;
-    await store.dispatch('add_item', payload);
-    toast(`已入库：${payload.name}`);
+    await runMutation('add_item', payload, `已入库：${payload.name}`);
   } else if (form.id === 'custom-move-form') {
     const fd = new FormData(form);
     const id = form.dataset.id;
     ui.modal = null;
-    await store.dispatch('move_item', { id, location: fd.get('location'), set_home: fd.get('set_home') === 'on' });
-    toast('位置已更新');
+    await runMutation('move_item', { id, location: fd.get('location'), set_home: fd.get('set_home') === 'on' }, '位置已更新');
   } else if (form.id === 'edit-item-form') {
     const fd = new FormData(form);
     const id = form.dataset.id;
@@ -317,19 +338,21 @@ document.addEventListener('submit', async (e) => {
       } : null,
     };
     ui.modal = null;
-    await store.dispatch('update_item', { id, patch });
-    toast('修改已保存');
+    await runMutation('update_item', { id, patch }, '修改已保存');
   } else if (form.id === 'settings-form') {
     const fd = new FormData(form);
+    const readOnly = fd.get('read_only') === 'on';
     try {
       await store.connect({
         owner: fd.get('owner'),
         repo: fd.get('repo'),
         branch: 'main',
         token: fd.get('token'),
+        readOnly,
       });
       ui.modal = null;
-      toast('已连接私有物品仓');
+      render();
+      toast(readOnly ? '已连接私有物品仓（只读搜索模式）' : '已连接私有物品仓');
     } catch (err) {
       toast(`连接失败：${err.message}`);
     }

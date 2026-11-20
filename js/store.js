@@ -10,6 +10,23 @@ export class ApiError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 
+export function formatApiError(err, phase = 'sync') {
+  if (!(err instanceof ApiError)) return err?.message || String(err);
+  if (err.status === 401) {
+    return 'Token 无效或已过期（HTTP 401），请在设置中检查或重新生成。';
+  }
+  if (err.status === 403) {
+    if (phase === 'write') {
+      return 'Token 无写入权限（HTTP 403）：若为 Contents: Read-only，请切为「只读搜索模式」或放弃待同步修改，以便继续拉取电脑端新增物品。';
+    }
+    return 'GitHub 拒绝访问（HTTP 403）：请检查 Token 是否勾选了该私有仓的 Contents 权限。';
+  }
+  if (err.status === 404) {
+    return '找不到仓库或分支（HTTP 404）：请确认仓库名正确，且 Token 已授权该私有仓（Only select repositories）。';
+  }
+  return `GitHub API 错误（HTTP ${err.status}）：${err.message}`;
+}
+
 // ---------- IndexedDB wrapper (falls back to in-memory for Node tests) ----------
 export function createMemoryKV() {
   const map = new Map();
@@ -393,9 +410,14 @@ export class VaultStore {
     this.outbox = [];
     this.syncState = 'demo'; // demo | idle | syncing | offline | error
     this.lastError = '';
+    this.lastErrorCode = null;
     this.lastSyncedAt = null;
     this.listeners = new Set();
     this._flushing = null;
+  }
+
+  get isReadOnly() {
+    return this.mode === 'github' && Boolean(this.config?.readOnly);
   }
 
   subscribe(fn) {
@@ -414,9 +436,13 @@ export class VaultStore {
     this.outbox = Array.isArray(outbox) ? outbox : [];
 
     if (cfg && cfg.owner && cfg.repo && cfg.token) {
-      this.config = cfg;
-      this.backend = this.backendFactory(cfg);
+      this.config = { ...cfg, readOnly: Boolean(cfg.readOnly) };
+      this.backend = this.backendFactory(this.config);
       this.mode = 'github';
+      if (this.config.readOnly && this.outbox.length) {
+        this.outbox = [];
+        await this.kv.set('outbox', []);
+      }
       if (cached && cached.itemsDoc && cached.locsDoc) {
         this.state = { itemsDoc: cached.itemsDoc, locsDoc: cached.locsDoc };
         this.lastSyncedAt = cached.syncedAt || null;
@@ -444,10 +470,17 @@ export class VaultStore {
       repo: String(cfg.repo || 'item-vault-data').trim(),
       branch: String(cfg.branch || 'main').trim() || 'main',
       token: String(cfg.token || '').trim(),
+      readOnly: Boolean(cfg.readOnly),
     };
     if (!clean.token) throw new Error('请输入 GitHub Token');
     const backend = this.backendFactory(clean);
-    const snap = await backend.pullSnapshot();
+    let snap;
+    try {
+      snap = await backend.pullSnapshot();
+    } catch (e) {
+      if (e instanceof ApiError) throw new ApiError(e.status, formatApiError(e, 'read'));
+      throw e;
+    }
     this.config = clean;
     this.backend = backend;
     this.mode = 'github';
@@ -456,6 +489,7 @@ export class VaultStore {
     this.lastSyncedAt = nowISO();
     this.syncState = 'idle';
     this.lastError = '';
+    this.lastErrorCode = null;
     await this.kv.set('config', clean);
     await this.kv.set('outbox', []);
     await this.kv.set('cache', { itemsDoc: snap.itemsDoc, locsDoc: snap.locsDoc, syncedAt: this.lastSyncedAt });
@@ -470,13 +504,41 @@ export class VaultStore {
     this.state = demoSnapshot();
     this.syncState = 'demo';
     this.lastError = '';
+    this.lastErrorCode = null;
     await this.kv.del('config');
     await this.kv.set('outbox', []);
     await this.kv.set('cache', { demo: true, itemsDoc: this.state.itemsDoc, locsDoc: this.state.locsDoc });
     this.emit();
   }
 
+  async discardOutboxAndSync() {
+    if (this.mode !== 'github' || !this.backend) return;
+    this.outbox = [];
+    this.lastError = '';
+    this.lastErrorCode = null;
+    await this.kv.set('outbox', []);
+    this.emit();
+    await this.sync();
+  }
+
+  async setReadOnly(enabled) {
+    if (this.mode !== 'github' || !this.config) return;
+    this.config = { ...this.config, readOnly: Boolean(enabled) };
+    await this.kv.set('config', this.config);
+    if (this.config.readOnly) {
+      this.outbox = [];
+      this.lastError = '';
+      this.lastErrorCode = null;
+      await this.kv.set('outbox', []);
+      this.emit();
+      await this.sync();
+    } else {
+      this.emit();
+    }
+  }
+
   async dispatch(type, payload) {
+    if (this.isReadOnly) return null;
     const op = {
       opId: `op_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
       ts: nowISO(),
@@ -499,36 +561,41 @@ export class VaultStore {
 
   async sync() {
     if (this.mode !== 'github' || !this.backend) return;
-    if (this.outbox.length) return this.flush();
+    if (!this.isReadOnly && this.outbox.length) return this.flush();
     this.syncState = 'syncing';
     this.lastError = '';
+    this.lastErrorCode = null;
     this.emit();
     try {
       const snap = await this.backend.pullSnapshot();
       // Re-check outbox in case user dispatched while pulling
-      if (this.outbox.length) return this.flush();
+      if (!this.isReadOnly && this.outbox.length) return this.flush();
       this.state = { itemsDoc: snap.itemsDoc, locsDoc: snap.locsDoc };
       this.lastSyncedAt = nowISO();
       this.syncState = 'idle';
+      this.lastError = '';
+      this.lastErrorCode = null;
       await this.kv.set('cache', { itemsDoc: snap.itemsDoc, locsDoc: snap.locsDoc, syncedAt: this.lastSyncedAt });
     } catch (e) {
       if (e instanceof NetworkError) {
         this.syncState = 'offline';
         this.lastError = e.message;
+        this.lastErrorCode = null;
       } else {
         this.syncState = 'error';
-        this.lastError = e.message || String(e);
+        this.lastErrorCode = e instanceof ApiError ? e.status : null;
+        this.lastError = formatApiError(e, 'read');
       }
     }
     this.emit();
   }
 
   async flush() {
-    if (this.mode !== 'github' || !this.backend) return;
+    if (this.mode !== 'github' || !this.backend || this.isReadOnly) return;
     if (this._flushing) {
       this._flushAgain = true;
       await this._flushing;
-      if (this._flushAgain && this.outbox.length) {
+      if (this._flushAgain && this.outbox.length && this.syncState !== 'error') {
         this._flushAgain = false;
         return this.flush();
       }
@@ -540,9 +607,10 @@ export class VaultStore {
   }
 
   async _doFlush() {
-    if (!this.outbox.length) return;
+    if (!this.outbox.length || this.isReadOnly) return;
     this.syncState = 'syncing';
     this.lastError = '';
+    this.lastErrorCode = null;
     this.emit();
 
     const maxRetries = 3;
@@ -582,6 +650,8 @@ export class VaultStore {
         this.state = merged;
         this.lastSyncedAt = nowISO();
         this.syncState = this.outbox.length ? 'syncing' : 'idle';
+        this.lastError = '';
+        this.lastErrorCode = null;
         await this.kv.set('outbox', this.outbox);
         await this.kv.set('cache', { itemsDoc: merged.itemsDoc, locsDoc: merged.locsDoc, syncedAt: this.lastSyncedAt });
         this.emit();
@@ -593,9 +663,11 @@ export class VaultStore {
         if (e instanceof NetworkError) {
           this.syncState = 'offline';
           this.lastError = e.message;
+          this.lastErrorCode = null;
         } else {
           this.syncState = 'error';
-          this.lastError = e.message || String(e);
+          this.lastErrorCode = e instanceof ApiError ? e.status : null;
+          this.lastError = formatApiError(e, 'write');
         }
         this.emit();
         return;
