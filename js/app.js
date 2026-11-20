@@ -96,7 +96,7 @@ function render() {
   root.innerHTML = `
     <header class="topbar">
       <div class="brand">
-        <span class="brand-mark"></span>
+        <img class="brand-mark" src="icons/favicon.svg?v=2" alt="" width="28" height="28">
         <h1>物品库</h1>
       </div>
       <div class="top-right">

@@ -57,9 +57,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .brand { display: flex; align-items: center; gap: 8px; }
 .brand-mark {
-  width: 24px; height: 24px; border-radius: 7px;
-  background: linear-gradient(135deg, #1d6b57 0%, #c45c3c 100%);
-  display: inline-block;
+  width: 28px; height: 28px; border-radius: 7px;
+  display: block; flex: 0 0 auto; object-fit: cover;
 }
 .brand h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.2px; }
 .top-right { display: flex; align-items: center; gap: 8px; }

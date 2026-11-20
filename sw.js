@@ -1,4 +1,4 @@
-const VERSION = 'itemvault-v1';
+const VERSION = 'itemvault-v2';
 const SHELL = [
   './',
   'index.html',
@@ -9,8 +9,9 @@ const SHELL = [
   'js/parser.js',
   'js/store.js',
   'js/views.js',
-  'icons/favicon.svg',
-  'icons/icon-192.png',
+  'icons/favicon.svg?v=2',
+  'icons/icon-192.png?v=2',
+  'icons/apple-touch-icon.png?v=2',
 ];
 
 self.addEventListener('install', (e) => {

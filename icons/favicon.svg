@@ -1,7 +1,213 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#1d6b57"/>
-  <rect x="92" y="128" width="328" height="256" rx="28" fill="#f5f3ee"/>
-  <rect x="92" y="246" width="328" height="14" fill="#1d6b57"/>
-  <rect x="208" y="176" width="96" height="24" rx="12" fill="#c45c3c"/>
-  <rect x="208" y="302" width="96" height="24" rx="12" fill="#1d6b57"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 824 824">
+  <defs>
+    <!-- Warm sunlit terracotta-apricot backdrop -->
+    <linearGradient id="bg" x1="0.08" y1="0.04" x2="0.92" y2="0.96">
+      <stop offset="0%" stop-color="#f6c690"/>
+      <stop offset="48%" stop-color="#e29463"/>
+      <stop offset="100%" stop-color="#c06647"/>
+    </linearGradient>
+    <radialGradient id="sunGlow" cx="0.22" cy="0.16" r="0.72">
+      <stop offset="0%" stop-color="#fff5d6" stop-opacity="0.72"/>
+      <stop offset="45%" stop-color="#ffdba0" stop-opacity="0.26"/>
+      <stop offset="100%" stop-color="#ffdba0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="warmDepth" cx="0.86" cy="0.90" r="0.64">
+      <stop offset="0%" stop-color="#873824" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#873824" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Cozy house body & wood finishes -->
+    <linearGradient id="houseBody" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#fffcf7"/>
+      <stop offset="55%" stop-color="#f8ecdc"/>
+      <stop offset="100%" stop-color="#ecd7be"/>
+    </linearGradient>
+    <linearGradient id="roofGrad" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#b85d3c"/>
+      <stop offset="55%" stop-color="#98452a"/>
+      <stop offset="100%" stop-color="#7c351f"/>
+    </linearGradient>
+    <linearGradient id="chimneyGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b76040"/>
+      <stop offset="100%" stop-color="#893e26"/>
+    </linearGradient>
+    <linearGradient id="woodLeg" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#b66b40"/>
+      <stop offset="100%" stop-color="#834324"/>
+    </linearGradient>
+    <linearGradient id="shelfBar" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#dfa66f"/>
+      <stop offset="100%" stop-color="#bc7e49"/>
+    </linearGradient>
+    <linearGradient id="drawerFace" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#eec08b"/>
+      <stop offset="55%" stop-color="#d99b60"/>
+      <stop offset="100%" stop-color="#c38047"/>
+    </linearGradient>
+    <radialGradient id="knobGrad" cx="0.36" cy="0.32" r="0.68">
+      <stop offset="0%" stop-color="#fffef9"/>
+      <stop offset="48%" stop-color="#f8dc9f"/>
+      <stop offset="100%" stop-color="#d59953"/>
+    </radialGradient>
+
+    <!-- Warm glowing lamplight interior -->
+    <radialGradient id="alcoveLight" cx="0.50" cy="0.10" r="0.88">
+      <stop offset="0%" stop-color="#fffbe6"/>
+      <stop offset="34%" stop-color="#ffe29c"/>
+      <stop offset="72%" stop-color="#f7be6a"/>
+      <stop offset="100%" stop-color="#e39a4b"/>
+    </radialGradient>
+    <radialGradient id="lampHalo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#fffdf0" stop-opacity="0.95"/>
+      <stop offset="55%" stop-color="#ffe18c" stop-opacity="0.50"/>
+      <stop offset="100%" stop-color="#ffca64" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="atticGlow" cx="0.45" cy="0.38" r="0.62">
+      <stop offset="0%" stop-color="#fff9db"/>
+      <stop offset="60%" stop-color="#ffd27c"/>
+      <stop offset="100%" stop-color="#e79e4f"/>
+    </radialGradient>
+
+    <!-- Cozy shelf items -->
+    <linearGradient id="potGrad" x1="0.2" y1="0" x2="0.9" y2="1">
+      <stop offset="0%" stop-color="#d97550"/>
+      <stop offset="100%" stop-color="#ae4e30"/>
+    </linearGradient>
+    <linearGradient id="leafMain" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#8bb883"/>
+      <stop offset="100%" stop-color="#588557"/>
+    </linearGradient>
+    <linearGradient id="leafBright" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#a2ca96"/>
+      <stop offset="100%" stop-color="#6c9a68"/>
+    </linearGradient>
+    <linearGradient id="bookSage" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6d9c8f"/>
+      <stop offset="100%" stop-color="#4a7469"/>
+    </linearGradient>
+    <linearGradient id="bookRose" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#d6785f"/>
+      <stop offset="100%" stop-color="#af533d"/>
+    </linearGradient>
+    <linearGradient id="bookHoney" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e9b25a"/>
+      <stop offset="100%" stop-color="#c48735"/>
+    </linearGradient>
+
+    <!-- Filters & clips -->
+    <filter id="softBlur" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+    <filter id="lampBlur" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <filter id="bodyShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#6e2a17" flood-opacity="0.28"/>
+    </filter>
+    <filter id="roofShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#5d2313" flood-opacity="0.26"/>
+    </filter>
+    <filter id="knobShadow" x="-40%" y="-40%" width="180%" height="190%">
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#7c421d" flood-opacity="0.34"/>
+    </filter>
+    <clipPath id="tile"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath>
+    <clipPath id="alcoveClip"><rect x="342" y="404" width="340" height="150" rx="28"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#tile)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#bg)"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#sunGlow)"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#warmDepth)"/>
+
+    <g>
+      <!-- Soft warm ground shadow -->
+      <ellipse cx="512" cy="792" rx="224" ry="26" fill="#6b2b18" opacity="0.24" filter="url(#softBlur)"/>
+
+      <!-- Cozy chimney tucked behind right slope -->
+      <rect x="634" y="256" width="56" height="114" rx="16" fill="url(#chimneyGrad)"/>
+      <rect x="628" y="250" width="68" height="22" rx="10" fill="#c76d49"/>
+
+      <!-- Sturdy rounded wooden feet -->
+      <path d="M336 734 H384 L375 786 C373 796 364 802 353 802 C342 802 333 795 332 785 Z" fill="url(#woodLeg)"/>
+      <path d="M640 734 H688 L692 785 C693 795 684 802 673 802 C662 802 653 796 651 786 Z" fill="url(#woodLeg)"/>
+
+      <!-- Cozy cream house cabinet body -->
+      <g filter="url(#bodyShadow)">
+        <path d="M512 262 L734 406 V712 C734 738 713 758 688 758 H336 C311 758 290 738 290 712 V406 Z"
+              fill="url(#houseBody)" stroke="#fffdf9" stroke-opacity="0.72" stroke-width="2.5"/>
+      </g>
+
+      <!-- Warm attic round cottage window (distinct from drawer knob) -->
+      <circle cx="512" cy="342" r="24" fill="#d59c6a"/>
+      <circle cx="512" cy="342" r="18.5" fill="url(#atticGlow)"/>
+      <path d="M512 323.5 V360.5 M493.5 342 H530.5" stroke="#c98b57" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="512" cy="342" r="18.5" fill="none" stroke="#b97b49" stroke-opacity="0.45" stroke-width="2"/>
+
+      <!-- Upper warm-lit shelf alcove -->
+      <rect x="336" y="398" width="352" height="162" rx="32" fill="#e1be99" opacity="0.55"/>
+      <g clip-path="url(#alcoveClip)">
+        <rect x="342" y="404" width="340" height="150" rx="28" fill="url(#alcoveLight)"/>
+        <!-- Soft glowing overhead warm pendant lamp -->
+        <circle cx="512" cy="422" r="82" fill="url(#lampHalo)" filter="url(#lampBlur)"/>
+        <path d="M484 404 H540 C540 420 528 430 512 430 C496 430 484 420 484 404 Z" fill="#fffdf2"/>
+        <path d="M478 404 H546 C544 412 532 416 512 416 C492 416 480 412 478 404 Z" fill="#c97446"/>
+
+        <!-- Subtle warm contact shadows on shelf floor -->
+        <ellipse cx="414" cy="552" rx="32" ry="5" fill="#9c5424" opacity="0.22"/>
+        <ellipse cx="592" cy="552" rx="64" ry="5" fill="#9c5424" opacity="0.20"/>
+
+        <!-- Cozy potted plant on left of shelf -->
+        <g>
+          <path d="M412 502 C406 472 384 456 368 456 C374 476 388 494 404 504 Z" fill="url(#leafMain)"/>
+          <path d="M416 502 C414 466 426 442 444 434 C446 458 436 484 422 504 Z" fill="url(#leafMain)"/>
+          <path d="M422 504 C434 480 452 468 468 468 C460 486 444 498 426 506 Z" fill="url(#leafBright)"/>
+          <path d="M384 506 H444 L437 550 C436 555 432 558 426 558 H402 C396 558 392 555 391 550 Z" fill="url(#potGrad)"/>
+          <rect x="378" y="498" width="72" height="14" rx="7" fill="#e1835c"/>
+        </g>
+
+        <!-- Cozy books / notebooks on right of shelf (cleanly resting, zero overlap) -->
+        <g>
+          <rect x="526" y="464" width="36" height="92" rx="7" fill="url(#bookSage)"/>
+          <rect x="531" y="478" width="26" height="6" rx="3" fill="#fff5e4" opacity="0.65"/>
+          <rect x="566" y="450" width="38" height="106" rx="7" fill="url(#bookRose)"/>
+          <rect x="572" y="466" width="26" height="6" rx="3" fill="#fff5e4" opacity="0.70"/>
+          <rect x="572" y="478" width="18" height="5" rx="2.5" fill="#fff5e4" opacity="0.45"/>
+          <g transform="rotate(-11 608 468)">
+            <rect x="608" y="466" width="33" height="92" rx="6" fill="url(#bookHoney)"/>
+            <rect x="613" y="482" width="23" height="6" rx="3" fill="#fff6e6" opacity="0.72"/>
+          </g>
+        </g>
+
+        <!-- Soft inner top rim shadow inside alcove -->
+        <rect x="342" y="404" width="340" height="150" rx="28" fill="none" stroke="#c9894c" stroke-opacity="0.34" stroke-width="5"/>
+      </g>
+
+      <!-- Warm wooden shelf ledge -->
+      <rect x="332" y="546" width="360" height="19" rx="9.5" fill="url(#shelfBar)"/>
+      <rect x="340" y="548" width="344" height="4" rx="2" fill="#ffebd0" opacity="0.55"/>
+
+      <!-- Lower honey-oak storage drawer -->
+      <rect x="338" y="582" width="348" height="134" rx="26" fill="#dec5a7" opacity="0.65"/>
+      <rect x="344" y="586" width="336" height="124" rx="22" fill="url(#drawerFace)"/>
+      <rect x="352" y="590" width="320" height="6" rx="3" fill="#ffe9c8" opacity="0.58"/>
+      <rect x="344" y="586" width="336" height="124" rx="22" fill="none" stroke="#b6733b" stroke-opacity="0.28" stroke-width="2.5"/>
+
+      <!-- Cozy round brass/cream wooden drawer knob -->
+      <circle cx="512" cy="649" r="27" fill="#a86332" opacity="0.28"/>
+      <g filter="url(#knobShadow)">
+        <circle cx="512" cy="647" r="22" fill="url(#knobGrad)"/>
+      </g>
+      <circle cx="505" cy="640" r="6" fill="#ffffff" opacity="0.72"/>
+
+      <!-- Sculpted warm walnut-cinnamon pitched roof -->
+      <g filter="url(#roofShadow)">
+        <path d="M236 426 L496 238 C506 231 518 231 528 238 L788 426"
+              fill="none" stroke="url(#roofGrad)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- Subtle warm top sunlit highlight along roof ridge -->
+        <path d="M244 411 L499 227 C507 221 517 221 525 227 L780 411"
+              fill="none" stroke="#e4946c" stroke-opacity="0.46" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </g>
+  </g>
+  <rect x="102" y="102" width="820" height="820" rx="183" fill="none" stroke="#fff6e8" stroke-opacity="0.30" stroke-width="3"/>
 </svg>

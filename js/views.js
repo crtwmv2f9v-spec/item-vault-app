@@ -471,7 +471,7 @@ export function renderSettingsModal(store) {
             <label>GitHub 用户名<input name="owner" value="${esc(cfg.owner)}" required /></label>
             <label>私有数据仓名<input name="repo" value="${esc(cfg.repo)}" required /></label>
           </div>
-          <label>Fine-grained Token（仅授权该私有仓 Contents: Read &amp; Write）
+          <label>Fine-grained Token（仅授权该私有仓 Contents：只搜选 Read-only，需手机端修改选 Read &amp; Write）
             <input name="token" type="password" value="${esc(cfg.token || '')}" placeholder="github_pat_..." required />
           </label>
           <div class="modal-foot space-between">
