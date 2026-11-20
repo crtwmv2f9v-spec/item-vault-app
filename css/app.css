@@ -225,7 +225,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .form-stack label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .form-stack input:not([type="checkbox"]), .form-stack select, .form-stack textarea {
   width: 100%; padding: 10px 11px; border-radius: 10px;
-  border: 1.5px solid var(--border); background: var(--bg); color: var(--text); font-size: 15px;
+  border: 1.5px solid var(--border); background: var(--bg); color: var(--text); font-size: 16px;
 }
 .form-stack label.chk-row { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-size: 14px; }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

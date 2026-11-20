@@ -1,20 +1,24 @@
 // Entry point, router, event delegation, and PWA service worker registration.
 
-import { getExpiringItems, getIdleRadar, getToBuyItems, todayISO } from './model.js';
+import { getActiveItems, getExpiringItems, getIdleRadar, getToBuyItems, todayISO } from './model.js';
 import { parseQuickText } from './parser.js';
 import { VaultStore } from './store.js';
 import {
   esc,
   renderBuyView,
   renderDetailModal,
+  renderDupBanner,
   renderEditModal,
   renderExpiringView,
   renderIdleView,
   renderMapView,
   renderMoveModal,
   renderQuickAddModal,
+  renderQuickPreviewContent,
+  renderSearchResults,
   renderSearchView,
   renderSettingsModal,
+  renderSettingsStatus,
   renderSyncBadge,
   toast,
 } from './views.js';
@@ -30,6 +34,119 @@ const ui = {
   quickText: '',
   formName: '',
 };
+
+const ua = navigator.userAgent || '';
+const isWebKit = /AppleWebKit/i.test(ua)
+  && (/iP(ad|hone|od)/i.test(ua) || !/Chrome|Chromium|Edg|OPR|Android/i.test(ua));
+let imeComposing = false;
+let imeTarget = null;
+let imeEndedAt = 0;
+let imeEndedTarget = null;
+let imeEndedEvent = null;
+let hasRendered = false;
+let pendingStoreRender = false;
+let backdropDown = false;
+
+function isComposingActive() {
+  if (imeComposing && (!imeTarget || !imeTarget.isConnected)) {
+    imeComposing = false;
+    imeTarget = null;
+  }
+  return imeComposing;
+}
+
+function isImeEvent(e) {
+  if (!e) return false;
+  if (e.isComposing || e.keyCode === 229 || e.which === 229 || e.key === 'Process') return true;
+  if (isComposingActive()) return true;
+  if (e === imeEndedEvent) return true;
+  if (isWebKit && imeEndedAt && (e.key === 'Enter' || e.key === 'Escape')
+    && (!imeEndedTarget || e.target === imeEndedTarget)
+    && performance.now() - imeEndedAt < 80) {
+    return true;
+  }
+  return false;
+}
+
+function isTypingElement(el = document.activeElement) {
+  if (!el) return false;
+  if (el.isContentEditable) return true;
+  if (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
+  if (el.tagName === 'INPUT') {
+    const t = (el.type || 'text').toLowerCase();
+    return !['button', 'submit', 'reset', 'checkbox', 'radio', 'file', 'image', 'range', 'color', 'hidden'].includes(t);
+  }
+  return false;
+}
+
+function handleLiveInput(target) {
+  if (!target) return;
+  if (target.id === 'search-input') {
+    ui.searchQuery = target.value;
+    const resultsEl = document.getElementById('search-results');
+    if (resultsEl) resultsEl.innerHTML = renderSearchResults(store, ui);
+    const clearBtn = document.getElementById('search-clear');
+    if (clearBtn) clearBtn.hidden = !ui.searchQuery;
+  } else if (target.id === 'quick-text') {
+    ui.quickText = target.value;
+    const parsed = parseQuickText(ui.quickText);
+    const prevEl = document.getElementById('quick-preview');
+    if (prevEl) prevEl.innerHTML = renderQuickPreviewContent(parsed);
+    const dupEl = document.getElementById('add-dup-banner');
+    if (dupEl) dupEl.innerHTML = renderDupBanner(store, parsed?.name || '');
+  } else if (target.name === 'name' && target.closest('#form-add-form')) {
+    ui.formName = target.value;
+    const dupEl = document.getElementById('add-dup-banner');
+    if (dupEl) dupEl.innerHTML = renderDupBanner(store, ui.formName);
+  }
+}
+
+function patchChromeAndPassiveViews() {
+  const badgeSlot = document.getElementById('sync-badge-slot');
+  if (badgeSlot) badgeSlot.innerHTML = renderSyncBadge(store);
+
+  const today = todayISO();
+  const items = store.state.itemsDoc.items || [];
+  const radar = getIdleRadar(items, today);
+  const counts = {
+    expiring: getExpiringItems(items, today).filter((x) => x.daysLeft <= 30).length,
+    idle: radar.unopened.length + radar.idle.length + radar.unverified.length,
+    buy: getToBuyItems(items).length,
+  };
+  for (const [routeId, count] of Object.entries(counts)) {
+    const btn = document.querySelector(`.tab-btn[data-route="${routeId}"]`);
+    if (!btn) continue;
+    let badge = btn.querySelector('.tab-count');
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('em');
+        badge.className = 'tab-count';
+        btn.appendChild(badge);
+      }
+      badge.textContent = String(count);
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+
+  if (ui.route === 'search') {
+    const allChip = document.querySelector('.filter-chip[data-filter="all"]');
+    if (allChip) allChip.textContent = `全部 (${getActiveItems(items).length})`;
+    const resultsEl = document.getElementById('search-results');
+    if (resultsEl) resultsEl.innerHTML = renderSearchResults(store, ui);
+  }
+  if (ui.modal?.kind === 'settings') {
+    const statusSlot = document.getElementById('settings-status-slot');
+    if (statusSlot) statusSlot.innerHTML = renderSettingsStatus(store);
+  }
+  if (ui.modal?.kind === 'add') {
+    const dupEl = document.getElementById('add-dup-banner');
+    if (dupEl) {
+      const q = ui.addTab === 'quick' ? (parseQuickText(ui.quickText)?.name || '') : ui.formName;
+      dupEl.innerHTML = renderDupBanner(store, q);
+    }
+  }
+}
 
 function parseHash() {
   const h = (location.hash || '#/search').replace(/^#\/?/, '');
@@ -64,10 +181,14 @@ async function runMutation(type, payload, okMsg) {
 function render() {
   const root = document.getElementById('app');
   if (!root) return;
-  const activeEl = document.activeElement;
-  const keepFocusId = activeEl && ['search-input', 'quick-text'].includes(activeEl.id) ? activeEl.id : null;
-  const selStart = keepFocusId ? activeEl.selectionStart : null;
-  const selEnd = keepFocusId ? activeEl.selectionEnd : null;
+  hasRendered = true;
+  pendingStoreRender = false;
+  imeComposing = false;
+  imeTarget = null;
+  imeEndedAt = 0;
+  imeEndedTarget = null;
+  imeEndedEvent = null;
+  backdropDown = false;
 
   const today = todayISO();
   const items = store.state.itemsDoc.items || [];
@@ -105,7 +226,7 @@ function render() {
         <h1>物品库</h1>
       </div>
       <div class="top-right">
-        ${renderSyncBadge(store)}
+        <span id="sync-badge-slot">${renderSyncBadge(store)}</span>
         ${store.isReadOnly ? '' : '<button class="btn-add" data-act="open-add">+ 录入</button>'}
         <button class="icon-btn" data-act="open-settings" aria-label="设置">⚙</button>
       </div>
@@ -119,14 +240,6 @@ function render() {
         </button>`).join('')}
     </nav>
     ${modalHtml}`;
-
-  if (keepFocusId) {
-    const el = document.getElementById(keepFocusId);
-    if (el) {
-      el.focus();
-      if (selStart !== null && el.setSelectionRange) el.setSelectionRange(selStart, selEnd);
-    }
-  }
 }
 
 function openPrintLabels() {
@@ -158,10 +271,28 @@ document.addEventListener('click', async (e) => {
     location.hash = `#/${btn.dataset.route}`;
   } else if (act === 'set-filter') {
     ui.searchFilter = btn.dataset.filter;
-    render();
+    const resultsEl = document.getElementById('search-results');
+    if (ui.route === 'search' && resultsEl) {
+      document.querySelectorAll('.filter-chip').forEach((chip) => {
+        chip.classList.toggle('active', chip.dataset.filter === ui.searchFilter);
+      });
+      resultsEl.innerHTML = renderSearchResults(store, ui);
+    } else {
+      render();
+    }
   } else if (act === 'clear-search') {
     ui.searchQuery = '';
-    render();
+    const inputEl = document.getElementById('search-input');
+    const resultsEl = document.getElementById('search-results');
+    const clearBtn = document.getElementById('search-clear');
+    if (inputEl && resultsEl) {
+      inputEl.value = '';
+      if (clearBtn) clearBtn.hidden = true;
+      resultsEl.innerHTML = renderSearchResults(store, ui);
+      inputEl.focus();
+    } else {
+      render();
+    }
   } else if (act === 'open-add') {
     if (store.isReadOnly) { toast('当前为只读搜索模式'); return; }
     ui.modal = { kind: 'add' };
@@ -169,6 +300,7 @@ document.addEventListener('click', async (e) => {
     ui.formName = '';
     render();
   } else if (act === 'add-tab') {
+    if (ui.addTab === btn.dataset.tab) return;
     ui.addTab = btn.dataset.tab;
     render();
   } else if (act === 'open-move') {
@@ -248,34 +380,87 @@ document.addEventListener('click', async (e) => {
     render();
     toast('已切换至本地演示模式');
   } else if (act === 'close-backdrop') {
-    if (e.target === btn) {
+    if (e.target === btn && (backdropDown || e.detail === 0) && !isComposingActive()) {
       ui.modal = null;
       render();
     }
+    backdropDown = false;
   } else if (act === 'close-modal') {
     ui.modal = null;
     render();
   }
 });
 
-document.addEventListener('input', (e) => {
-  if (e.target.id === 'search-input') {
-    ui.searchQuery = e.target.value;
-    render();
-  } else if (e.target.id === 'quick-text') {
-    ui.quickText = e.target.value;
-    render();
-  } else if (e.target.name === 'name' && e.target.closest('#form-add-form')) {
-    ui.formName = e.target.value;
-    render();
+document.addEventListener('pointerdown', (e) => {
+  backdropDown = Boolean(e.target?.dataset?.act === 'close-backdrop');
+}, true);
+
+document.addEventListener('compositionstart', (e) => {
+  imeComposing = true;
+  imeTarget = e.target;
+  imeEndedAt = 0;
+  imeEndedTarget = null;
+  imeEndedEvent = null;
+}, true);
+
+document.addEventListener('compositionend', (e) => {
+  imeComposing = false;
+  imeTarget = null;
+  imeEndedAt = performance.now();
+  imeEndedTarget = e.target;
+  imeEndedEvent = null;
+  handleLiveInput(e.target);
+}, true);
+
+document.addEventListener('keydown', (e) => {
+  if (!imeEndedAt) {
+    if (imeEndedEvent && imeEndedEvent !== e) imeEndedEvent = null;
+    return;
   }
+  const same = !imeEndedTarget || e.target === imeEndedTarget;
+  if (isWebKit && same && performance.now() - imeEndedAt < 80 && (e.key === 'Enter' || e.key === 'Escape')) {
+    imeEndedEvent = e;
+  } else {
+    imeEndedEvent = null;
+  }
+  imeEndedAt = 0;
+  imeEndedTarget = null;
+}, true);
+
+document.addEventListener('focusout', (e) => {
+  if (e.target === imeTarget) {
+    const prev = imeTarget;
+    imeComposing = false;
+    imeTarget = null;
+    if (prev?.isConnected) handleLiveInput(prev);
+  }
+  if (pendingStoreRender && !ui.modal) {
+    setTimeout(() => {
+      if (pendingStoreRender && !ui.modal && !isTypingElement() && !isComposingActive()) {
+        render();
+      }
+    }, 0);
+  }
+}, true);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target?.tagName === 'INPUT' && e.target.form && !e.isComposing && isImeEvent(e)) {
+    e.preventDefault();
+  }
+});
+
+document.addEventListener('input', (e) => {
+  if (e.isComposing || isComposingActive()) return;
+  handleLiveInput(e.target);
 });
 
 document.addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = e.target;
   if (form.id === 'quick-add-form') {
-    const parsed = parseQuickText(ui.quickText);
+    const rawText = form.querySelector('#quick-text')?.value ?? ui.quickText;
+    ui.quickText = rawText;
+    const parsed = parseQuickText(rawText);
     if (!parsed || !parsed.name) { toast('请输入物品信息'); return; }
     ui.modal = null;
     await runMutation('add_item', parsed, `已入库：${parsed.name}`);
@@ -362,13 +547,31 @@ document.addEventListener('submit', async (e) => {
 window.addEventListener('hashchange', () => { parseHash(); render(); });
 window.addEventListener('online', () => { store.sync(); });
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') store.sync();
+  if (document.hidden) {
+    const prev = imeTarget;
+    imeComposing = false;
+    imeTarget = null;
+    imeEndedAt = 0;
+    imeEndedTarget = null;
+    imeEndedEvent = null;
+    if (prev?.isConnected) handleLiveInput(prev);
+  } else if (document.visibilityState === 'visible') {
+    store.sync();
+  }
 });
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 
-store.subscribe(() => render());
+store.subscribe(() => {
+  const modalInDom = Boolean(document.querySelector('.modal-backdrop'));
+  if (hasRendered && Boolean(ui.modal) === modalInDom && (ui.modal || isTypingElement() || isComposingActive())) {
+    if (ui.modal || ui.route !== 'search') pendingStoreRender = true;
+    patchChromeAndPassiveViews();
+    return;
+  }
+  render();
+});
 parseHash();
 store.init();

@@ -121,19 +121,10 @@ export function renderItemCard(it, today, opts = {}) {
     </article>`;
 }
 
-export function renderSearchView(store, ui) {
+export function renderSearchResults(store, ui) {
   const today = todayISO();
   const readOnly = Boolean(store.isReadOnly);
   const active = getActiveItems(store.state.itemsDoc.items);
-  const filters = [
-    { id: 'all', label: `全部 (${active.length})` },
-    { id: 'home', label: '家' },
-    { id: 'office', label: '办公室' },
-    { id: 'lab', label: '实验室' },
-    { id: 'notebook', label: '本子' },
-    { id: 'away', label: '带出未归位' },
-    { id: 'raw', label: '待整理' },
-  ];
   const q = ui.searchQuery || '';
   const f = ui.searchFilter || 'all';
   const filtered = active
@@ -151,21 +142,38 @@ export function renderSearchView(store, ui) {
     .filter((x) => x.sc > 0)
     .sort((a, b) => (b.sc - a.sc) || a.it.id.localeCompare(b.it.id));
 
+  return filtered.length
+    ? `<div class="card-list">${filtered.map(({ it }) => renderItemCard(it, today, { readOnly })).join('')}</div>`
+    : `<div class="empty-box">
+         <p>${active.length ? `没有找到匹配「${esc(q)}」的物品` : '物品库还是空的'}</p>
+         ${readOnly ? '' : '<button class="btn-primary" data-act="open-add">+ 录入第一件物品</button>'}
+       </div>`;
+}
+
+export function renderSearchView(store, ui) {
+  const active = getActiveItems(store.state.itemsDoc.items);
+  const filters = [
+    { id: 'all', label: `全部 (${active.length})` },
+    { id: 'home', label: '家' },
+    { id: 'office', label: '办公室' },
+    { id: 'lab', label: '实验室' },
+    { id: 'notebook', label: '本子' },
+    { id: 'away', label: '带出未归位' },
+    { id: 'raw', label: '待整理' },
+  ];
+  const q = ui.searchQuery || '';
+  const f = ui.searchFilter || 'all';
+
   return `
     <section class="panel">
       <div class="search-box">
         <input id="search-input" type="search" placeholder="搜名称 / 别名 / 地点 / 容器码 / 本子主题…" value="${esc(q)}" autocomplete="off" />
-        ${q ? '<button class="clear-btn" data-act="clear-search" aria-label="清空">✕</button>' : ''}
+        <button id="search-clear" class="clear-btn" data-act="clear-search" aria-label="清空"${q ? '' : ' hidden'}>✕</button>
       </div>
       <div class="chip-row">
         ${filters.map((x) => `<button class="filter-chip ${f === x.id ? 'active' : ''}" data-act="set-filter" data-filter="${x.id}">${esc(x.label)}</button>`).join('')}
       </div>
-      ${filtered.length
-        ? `<div class="card-list">${filtered.map(({ it }) => renderItemCard(it, today, { readOnly })).join('')}</div>`
-        : `<div class="empty-box">
-             <p>${active.length ? `没有找到匹配「${esc(q)}」的物品` : '物品库还是空的'}</p>
-             ${readOnly ? '' : '<button class="btn-primary" data-act="open-add">+ 录入第一件物品</button>'}
-           </div>`}
+      <div id="search-results">${renderSearchResults(store, ui)}</div>
     </section>`;
 }
 
@@ -292,20 +300,36 @@ export function renderMapView(store, locCode = '') {
 
 // ---------- Modals ----------
 
-export function renderQuickAddModal(store, state) {
-  const tab = state.addTab || 'quick';
-  const rawText = state.quickText || '';
-  const parsed = tab === 'quick' ? parseQuickText(rawText) : null;
-  const dupQuery = tab === 'quick' ? (parsed?.name || '') : (state.formName || '');
-  const dups = dupQuery.length >= 2 ? findDuplicates(store.state.itemsDoc.items, dupQuery) : [];
-  const locs = store.state.locsDoc.locations || [];
-
-  const dupBanner = dups.length
+export function renderDupBanner(store, dupQuery) {
+  const q = String(dupQuery || '').trim();
+  const dups = q.length >= 2 ? findDuplicates(store.state.itemsDoc.items, q) : [];
+  return dups.length
     ? `<div class="dup-alert">
          <strong>防买重 / 重复提醒：</strong>
          ${dups.slice(0, 3).map((d) => `<div>· [${esc(d.reason)}] ${esc(d.item.name)}（${esc(d.item.qty)}${esc(d.item.unit)}）@ ${esc(d.item.current_location)}</div>`).join('')}
        </div>`
     : '';
+}
+
+export function renderQuickPreviewContent(parsed) {
+  return parsed ? `
+    <span>名称：<b>${esc(parsed.name)}</b></span>
+    <span>数量：<b>${esc(parsed.qty)}${esc(parsed.unit)}</b></span>
+    <span>地点：<b>${esc(parsed.current_location)}</b></span>
+    <span>类型：<b>${esc(TYPE_LABELS[parsed.item_type])}</b></span>
+    ${parsed.unopened_qty ? `<span>未拆：<b>${esc(parsed.unopened_qty)}</b></span>` : ''}
+    ${parsed.use_by ? `<span>限期：<b>${esc(parsed.use_by)}</b></span>` : ''}
+    ${parsed.remind_use_on ? `<span>提醒用：<b>${esc(parsed.remind_use_on)}</b></span>` : ''}
+    ${parsed.need_buy ? `<span><b>待买${parsed.remind_buy_on ? ` (${esc(parsed.remind_buy_on)})` : ''}</b></span>` : ''}
+  ` : '<span class="muted">输入物品、数量、存放地点即可，本地即时可搜。</span>';
+}
+
+export function renderQuickAddModal(store, state) {
+  const tab = state.addTab || 'quick';
+  const rawText = state.quickText || '';
+  const parsed = tab === 'quick' ? parseQuickText(rawText) : null;
+  const dupQuery = tab === 'quick' ? (parsed?.name || '') : (state.formName || '');
+  const locs = store.state.locsDoc.locations || [];
 
   return `
     <div class="modal-backdrop" data-act="close-backdrop">
@@ -318,21 +342,12 @@ export function renderQuickAddModal(store, state) {
           <button class="${tab === 'quick' ? 'active' : ''}" data-act="add-tab" data-tab="quick">一句话速录</button>
           <button class="${tab === 'form' ? 'active' : ''}" data-act="add-tab" data-tab="form">4 格表单</button>
         </div>
-        ${dupBanner}
+        <div id="add-dup-banner">${renderDupBanner(store, dupQuery)}</div>
         ${tab === 'quick' ? `
           <form id="quick-add-form" class="form-stack">
             <textarea id="quick-text" rows="3" placeholder="例：化学护目镜 1副 放实验室个人抽屉 可套近视镜&#10;例：挂耳咖啡 2袋 家厨房柜 12月15日前用完 1袋未拆">${esc(rawText)}</textarea>
             <div id="quick-preview" class="preview-box">
-              ${parsed ? `
-                <span>名称：<b>${esc(parsed.name)}</b></span>
-                <span>数量：<b>${esc(parsed.qty)}${esc(parsed.unit)}</b></span>
-                <span>地点：<b>${esc(parsed.current_location)}</b></span>
-                <span>类型：<b>${esc(TYPE_LABELS[parsed.item_type])}</b></span>
-                ${parsed.unopened_qty ? `<span>未拆：<b>${esc(parsed.unopened_qty)}</b></span>` : ''}
-                ${parsed.use_by ? `<span>限期：<b>${esc(parsed.use_by)}</b></span>` : ''}
-                ${parsed.remind_use_on ? `<span>提醒用：<b>${esc(parsed.remind_use_on)}</b></span>` : ''}
-                ${parsed.need_buy ? `<span><b>待买${parsed.remind_buy_on ? ` (${esc(parsed.remind_buy_on)})` : ''}</b></span>` : ''}
-              ` : '<span class="muted">输入物品、数量、存放地点即可，本地即时可搜。</span>'}
+              ${renderQuickPreviewContent(parsed)}
             </div>
             <div class="modal-foot">
               <button type="button" class="btn-chip" data-act="close-modal">取消</button>
@@ -341,7 +356,7 @@ export function renderQuickAddModal(store, state) {
           </form>
         ` : `
           <form id="form-add-form" class="form-stack">
-            <label>物品名称 *<input name="name" required value="${esc(state.formName || '')}" placeholder="如：化学护目镜 / 泳裤 / 驾考错题本" /></label>
+            <label>物品名称 *<input id="form-add-name" name="name" required value="${esc(state.formName || '')}" placeholder="如：化学护目镜 / 泳裤 / 驾考错题本" /></label>
             <label>描述<input name="desc" placeholder="颜色、型号、特点或备注" /></label>
             <div class="row-2">
               <label>数量<input name="qty" type="number" step="any" min="0" value="1" /></label>
@@ -527,11 +542,28 @@ export function renderDetailModal(store, itemId) {
     </div>`;
 }
 
-export function renderSettingsModal(store) {
-  const cfg = store.config || { owner: 'crtwmv2f9v-spec', repo: 'item-vault-data', branch: 'main', token: '', readOnly: false };
+export function renderSettingsStatus(store) {
   const modeLabel = store.mode === 'github'
     ? (store.isReadOnly ? '私有 GitHub 仓库（只读搜索）' : '私有 GitHub 仓库（可读写）')
     : '本地演示模式';
+  return `
+    <div class="status-box">
+      <div>模式：<b>${modeLabel}</b></div>
+      ${store.isReadOnly
+        ? '<div>权限：<b>只读搜索（新增与修改请从电脑端同步）</b></div>'
+        : `<div>离线队列：<b>${store.outbox.length} 条待同步</b></div>`}
+      ${store.lastSyncedAt ? `<div>上次同步：${esc(store.lastSyncedAt.replace('T', ' ').slice(0, 19))}</div>` : ''}
+      ${store.lastError ? `<div class="err-line">${esc(store.lastError)}</div>` : ''}
+      ${store.mode === 'github' && store.outbox.length > 0 ? `
+        <div class="status-actions">
+          ${store.lastErrorCode === 403 ? '<button type="button" class="btn-chip btn-accent" data-act="switch-readonly">切为只读模式并拉取最新</button>' : ''}
+          <button type="button" class="btn-chip" data-act="discard-outbox">放弃待同步并拉取最新</button>
+        </div>` : ''}
+    </div>`;
+}
+
+export function renderSettingsModal(store) {
+  const cfg = store.config || { owner: 'crtwmv2f9v-spec', repo: 'item-vault-data', branch: 'main', token: '', readOnly: false };
   const roUrl = buildTokenUrl(cfg.owner, true);
   const rwUrl = buildTokenUrl(cfg.owner, false);
   return `
@@ -541,19 +573,7 @@ export function renderSettingsModal(store) {
           <h3>同步与仓库设置</h3>
           <button class="icon-btn" data-act="close-modal">✕</button>
         </div>
-        <div class="status-box">
-          <div>模式：<b>${modeLabel}</b></div>
-          ${store.isReadOnly
-            ? '<div>权限：<b>只读搜索（新增与修改请从电脑端同步）</b></div>'
-            : `<div>离线队列：<b>${store.outbox.length} 条待同步</b></div>`}
-          ${store.lastSyncedAt ? `<div>上次同步：${esc(store.lastSyncedAt.replace('T', ' ').slice(0, 19))}</div>` : ''}
-          ${store.lastError ? `<div class="err-line">${esc(store.lastError)}</div>` : ''}
-          ${store.mode === 'github' && store.outbox.length > 0 ? `
-            <div class="status-actions">
-              ${store.lastErrorCode === 403 ? '<button type="button" class="btn-chip btn-accent" data-act="switch-readonly">切为只读模式并拉取最新</button>' : ''}
-              <button type="button" class="btn-chip" data-act="discard-outbox">放弃待同步并拉取最新</button>
-            </div>` : ''}
-        </div>
+        <div id="settings-status-slot">${renderSettingsStatus(store)}</div>
         <form id="settings-form" class="form-stack">
           <div class="row-2">
             <label>GitHub 用户名<input name="owner" value="${esc(cfg.owner)}" required /></label>
