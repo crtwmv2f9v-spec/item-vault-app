@@ -1,15 +1,25 @@
-// Entry point, router, event delegation, and PWA service worker registration.
+// Entry point, router, theme manager, event delegation, and PWA service worker registration.
 
-import { getActiveItems, getExpiringItems, getIdleRadar, getToBuyItems, todayISO } from './model.js';
+import {
+  TAXONOMY,
+  getExpiringItems,
+  getIdleRadar,
+  getSubcategoriesForDomain,
+  getToBuyItems,
+  todayISO,
+} from './model.js';
 import { parseQuickText } from './parser.js';
 import { VaultStore } from './store.js';
 import {
+  ICONS,
   esc,
   renderBuyView,
   renderDetailModal,
+  renderDomainFilterRow,
   renderDupBanner,
   renderEditModal,
   renderExpiringView,
+  renderFormTaxHint,
   renderIdleView,
   renderMapView,
   renderMoveModal,
@@ -19,9 +29,42 @@ import {
   renderSearchView,
   renderSettingsModal,
   renderSettingsStatus,
+  renderSpaceFilterRow,
+  renderSubcatFilterRow,
   renderSyncBadge,
+  renderWelcomeStrip,
   toast,
 } from './views.js';
+
+const THEME_KEY = 'itemvault-theme';
+const VALID_THEMES = ['light', 'system', 'dark'];
+const darkMql = typeof window !== 'undefined' && window.matchMedia
+  ? window.matchMedia('(prefers-color-scheme: dark)')
+  : null;
+
+function readSavedTheme() {
+  try {
+    const v = localStorage.getItem(THEME_KEY);
+    return VALID_THEMES.includes(v) ? v : 'light';
+  } catch {
+    return 'light';
+  }
+}
+
+function effectiveDark(mode) {
+  return mode === 'dark' || (mode === 'system' && Boolean(darkMql?.matches));
+}
+
+function applyTheme(mode, persist = true) {
+  const clean = VALID_THEMES.includes(mode) ? mode : 'light';
+  ui.theme = clean;
+  document.documentElement.dataset.theme = clean;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', effectiveDark(clean) ? '#231f1c' : '#fcfaf6');
+  if (persist) {
+    try { localStorage.setItem(THEME_KEY, clean); } catch { /* ignore */ }
+  }
+}
 
 const store = new VaultStore();
 const ui = {
@@ -29,11 +72,19 @@ const ui = {
   locCode: '',
   searchQuery: '',
   searchFilter: 'all',
+  domainFilter: 'all',
+  categoryFilter: 'all',
+  theme: readSavedTheme(),
   modal: null, // null | { kind: 'add'|'move'|'edit'|'settings', ... }
   addTab: 'quick',
   quickText: '',
   formName: '',
 };
+
+applyTheme(ui.theme, false);
+darkMql?.addEventListener?.('change', () => {
+  if (ui.theme === 'system') applyTheme('system', false);
+});
 
 const ua = navigator.userAgent || '';
 const isWebKit = /AppleWebKit/i.test(ua)
@@ -79,6 +130,17 @@ function isTypingElement(el = document.activeElement) {
   return false;
 }
 
+function refreshSearchSurface() {
+  const domSlot = document.getElementById('domain-bar-slot');
+  if (domSlot) domSlot.innerHTML = renderDomainFilterRow(store, ui);
+  const subSlot = document.getElementById('subcat-bar-slot');
+  if (subSlot) subSlot.innerHTML = renderSubcatFilterRow(store, ui);
+  const spSlot = document.getElementById('space-bar-slot');
+  if (spSlot) spSlot.innerHTML = renderSpaceFilterRow(store, ui);
+  const resultsEl = document.getElementById('search-results');
+  if (resultsEl) resultsEl.innerHTML = renderSearchResults(store, ui);
+}
+
 function handleLiveInput(target) {
   if (!target) return;
   if (target.id === 'search-input') {
@@ -98,6 +160,8 @@ function handleLiveInput(target) {
     ui.formName = target.value;
     const dupEl = document.getElementById('add-dup-banner');
     if (dupEl) dupEl.innerHTML = renderDupBanner(store, ui.formName);
+    const hintEl = document.getElementById('form-tax-hint');
+    if (hintEl) hintEl.innerHTML = renderFormTaxHint(ui.formName);
   }
 }
 
@@ -130,10 +194,9 @@ function patchChromeAndPassiveViews() {
   }
 
   if (ui.route === 'search') {
-    const allChip = document.querySelector('.filter-chip[data-filter="all"]');
-    if (allChip) allChip.textContent = `全部 (${getActiveItems(items).length})`;
-    const resultsEl = document.getElementById('search-results');
-    if (resultsEl) resultsEl.innerHTML = renderSearchResults(store, ui);
+    const sumSlot = document.getElementById('home-summary-slot');
+    if (sumSlot) sumSlot.innerHTML = renderWelcomeStrip(store);
+    refreshSearchSurface();
   }
   if (ui.modal?.kind === 'settings') {
     const statusSlot = document.getElementById('settings-status-slot');
@@ -209,35 +272,43 @@ function render() {
   else if (ui.modal?.kind === 'move' && !store.isReadOnly) modalHtml = renderMoveModal(store, ui.modal.id);
   else if (ui.modal?.kind === 'edit') {
     modalHtml = store.isReadOnly ? renderDetailModal(store, ui.modal.id) : renderEditModal(store, ui.modal.id);
-  } else if (ui.modal?.kind === 'settings') modalHtml = renderSettingsModal(store);
+  } else if (ui.modal?.kind === 'settings') modalHtml = renderSettingsModal(store, ui.theme);
 
   const tabs = [
-    { id: 'search', label: '秒搜', count: 0 },
-    { id: 'expiring', label: '限期', count: expCount },
-    { id: 'idle', label: '吃灰', count: idleCount },
-    { id: 'buy', label: '采购', count: buyCount },
-    { id: 'map', label: '本子/箱', count: 0 },
+    { id: 'search', label: '秒搜', icon: ICONS.search, count: 0 },
+    { id: 'expiring', label: '限期', icon: ICONS.expiring, count: expCount },
+    { id: 'idle', label: '吃灰', icon: ICONS.idle, count: idleCount },
+    { id: 'buy', label: '采购', icon: ICONS.buy, count: buyCount },
+    { id: 'map', label: '分类/箱', icon: ICONS.map, count: 0 },
   ];
 
   root.innerHTML = `
     <header class="topbar">
-      <div class="brand">
-        <img class="brand-mark" src="icons/favicon.svg?v=2" alt="" width="28" height="28">
-        <h1>物品库</h1>
-      </div>
-      <div class="top-right">
-        <span id="sync-badge-slot">${renderSyncBadge(store)}</span>
-        ${store.isReadOnly ? '' : '<button class="btn-add" data-act="open-add">+ 录入</button>'}
-        <button class="icon-btn" data-act="open-settings" aria-label="设置">⚙</button>
+      <div class="topbar-inner">
+        <div class="brand">
+          <img class="brand-mark" src="icons/favicon.svg?v=2" alt="" width="32" height="32">
+          <div class="brand-text">
+            <h1>物品库</h1>
+            <span class="brand-sub">暖光收纳小仓</span>
+          </div>
+        </div>
+        <div class="top-right">
+          <span id="sync-badge-slot">${renderSyncBadge(store)}</span>
+          ${store.isReadOnly ? '' : '<button class="btn-add" data-act="open-add">+ 录入</button>'}
+          <button class="icon-btn" data-act="open-settings" aria-label="设置">${ICONS.gear}</button>
+        </div>
       </div>
     </header>
     <main class="main">${mainHtml}</main>
     <nav class="tabbar" aria-label="主导航">
-      ${tabs.map((t) => `
-        <button class="tab-btn ${ui.route === t.id ? 'active' : ''}" data-act="nav" data-route="${t.id}">
-          <span>${t.label}</span>
-          ${t.count > 0 ? `<em class="tab-count">${t.count}</em>` : ''}
-        </button>`).join('')}
+      <div class="tabbar-inner">
+        ${tabs.map((t) => `
+          <button class="tab-btn ${ui.route === t.id ? 'active' : ''}" data-act="nav" data-route="${t.id}">
+            <span class="tab-ic">${t.icon}</span>
+            <span class="tab-lbl">${t.label}</span>
+            ${t.count > 0 ? `<em class="tab-count">${t.count}</em>` : ''}
+          </button>`).join('')}
+      </div>
     </nav>
     ${modalHtml}`;
 }
@@ -247,13 +318,13 @@ function openPrintLabels() {
   const win = window.open('', '_blank');
   if (!win) { toast('请允许浏览器打开打印页'); return; }
   const cards = locs.map((l) => `
-    <div style="border:1.5px solid #222;border-radius:8px;padding:10px 12px;break-inside:avoid;">
-      <div style="font-size:22px;font-weight:700;letter-spacing:1px;">${esc(l.code)}</div>
-      <div style="font-size:12px;color:#444;margin-top:4px;">${esc(l.site)} · ${esc(l.zone)} · ${esc(l.container)}</div>
-      <div style="font-size:10px;color:#777;margin-top:4px;word-break:break-all;">#/loc/${esc(l.code)}</div>
+    <div style="border:1.5px solid #4a3f38;border-radius:10px;padding:10px 12px;break-inside:avoid;">
+      <div style="font-size:22px;font-weight:700;letter-spacing:1px;color:#342c26;">${esc(l.code)}</div>
+      <div style="font-size:12px;color:#5c524a;margin-top:4px;">${esc(l.site)} · ${esc(l.zone)} · ${esc(l.container)}</div>
+      <div style="font-size:10px;color:#8a7d72;margin-top:4px;word-break:break-all;">#/loc/${esc(l.code)}</div>
     </div>`).join('');
   win.document.write(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>容器短码贴纸</title></head>
-    <body style="font-family:-apple-system,PingFang SC,Arial,sans-serif;padding:16px;">
+    <body style="font-family:-apple-system,PingFang SC,Arial,sans-serif;padding:16px;color:#342c26;">
       <h2 style="margin:0 0 12px;font-size:16px;">物品库容器短码贴纸（剪下贴在抽屉/箱外）</h2>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">${cards}</div>
       <script>window.print();</script>
@@ -271,15 +342,72 @@ document.addEventListener('click', async (e) => {
     location.hash = `#/${btn.dataset.route}`;
   } else if (act === 'set-filter') {
     ui.searchFilter = btn.dataset.filter;
-    const resultsEl = document.getElementById('search-results');
-    if (ui.route === 'search' && resultsEl) {
-      document.querySelectorAll('.filter-chip').forEach((chip) => {
-        chip.classList.toggle('active', chip.dataset.filter === ui.searchFilter);
-      });
-      resultsEl.innerHTML = renderSearchResults(store, ui);
+    if (btn.dataset.resetDomain === '1') {
+      ui.domainFilter = 'all';
+      ui.categoryFilter = 'all';
+      ui.searchQuery = '';
+      const inputEl = document.getElementById('search-input');
+      const clearBtn = document.getElementById('search-clear');
+      if (inputEl) inputEl.value = '';
+      if (clearBtn) clearBtn.hidden = true;
+    }
+    if (ui.route === 'search' && document.getElementById('search-results')) {
+      refreshSearchSurface();
+    } else {
+      ui.route = 'search';
+      location.hash = '#/search';
+      render();
+    }
+  } else if (act === 'set-domain') {
+    ui.domainFilter = btn.dataset.domain || 'all';
+    ui.categoryFilter = 'all';
+    if (ui.route === 'search' && document.getElementById('search-results')) {
+      refreshSearchSurface();
+      document.querySelector('.dom-chip.active')?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' });
     } else {
       render();
     }
+  } else if (act === 'set-category') {
+    ui.categoryFilter = btn.dataset.category || 'all';
+    if (ui.route === 'search' && document.getElementById('search-results')) {
+      refreshSearchSurface();
+    } else {
+      render();
+    }
+  } else if (act === 'open-domain') {
+    ui.searchQuery = '';
+    ui.domainFilter = btn.dataset.domain || 'all';
+    ui.categoryFilter = 'all';
+    ui.searchFilter = 'all';
+    ui.locCode = '';
+    if (location.hash === '#/search') {
+      ui.route = 'search';
+      render();
+    } else {
+      location.hash = '#/search';
+    }
+  } else if (act === 'reset-filters') {
+    ui.searchQuery = '';
+    ui.searchFilter = 'all';
+    ui.domainFilter = 'all';
+    ui.categoryFilter = 'all';
+    const inputEl = document.getElementById('search-input');
+    const clearBtn = document.getElementById('search-clear');
+    if (inputEl) inputEl.value = '';
+    if (clearBtn) clearBtn.hidden = true;
+    if (ui.route === 'search' && document.getElementById('search-results')) {
+      refreshSearchSurface();
+    } else {
+      render();
+    }
+  } else if (act === 'set-theme') {
+    const next = btn.dataset.theme || 'light';
+    applyTheme(next, true);
+    document.querySelectorAll('.theme-opt').forEach((el) => {
+      el.classList.toggle('active', el.dataset.theme === ui.theme);
+    });
+    const labels = { light: '暖阳明亮', system: '跟随系统', dark: '柔和夜灯' };
+    toast(`已切换至「${labels[ui.theme] || ui.theme}」外观`);
   } else if (act === 'clear-search') {
     ui.searchQuery = '';
     const inputEl = document.getElementById('search-input');
@@ -376,6 +504,10 @@ document.addEventListener('click', async (e) => {
     URL.revokeObjectURL(a.href);
   } else if (act === 'use-demo') {
     await store.switchDemo();
+    ui.searchQuery = '';
+    ui.searchFilter = 'all';
+    ui.domainFilter = 'all';
+    ui.categoryFilter = 'all';
     ui.modal = null;
     render();
     toast('已切换至本地演示模式');
@@ -389,6 +521,21 @@ document.addEventListener('click', async (e) => {
     ui.modal = null;
     render();
   }
+});
+
+// Cascading domain -> subcategory datalist updates (never recreates modal DOM)
+document.addEventListener('change', (e) => {
+  const sel = e.target;
+  if (!sel || sel.tagName !== 'SELECT' || sel.name !== 'domain') return;
+  const listId = sel.dataset.catList;
+  if (!listId) return;
+  const dl = document.getElementById(listId);
+  if (!dl) return;
+  const domainName = sel.value;
+  const subs = domainName
+    ? getSubcategoriesForDomain(domainName, store.state.itemsDoc.items)
+    : TAXONOMY.flatMap((d) => d.subcategories);
+  dl.innerHTML = subs.map((c) => `<option value="${esc(c)}"></option>`).join('');
 });
 
 document.addEventListener('pointerdown', (e) => {
@@ -470,6 +617,8 @@ document.addEventListener('submit', async (e) => {
     const payload = {
       name: fd.get('name'),
       desc: fd.get('desc'),
+      domain: fd.get('domain') || '',
+      category: fd.get('category') || '',
       qty: Number(fd.get('qty') || 1),
       unit: fd.get('unit') || '件',
       unopened_qty: Number(fd.get('unopened_qty') || 0),
@@ -535,6 +684,10 @@ document.addEventListener('submit', async (e) => {
         token: fd.get('token'),
         readOnly,
       });
+      ui.searchQuery = '';
+      ui.searchFilter = 'all';
+      ui.domainFilter = 'all';
+      ui.categoryFilter = 'all';
       ui.modal = null;
       render();
       toast(readOnly ? '已连接私有物品仓（只读搜索模式）' : '已连接私有物品仓');

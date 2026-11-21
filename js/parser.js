@@ -1,12 +1,7 @@
 // Lightweight Chinese natural-language parser for 1-line quick item capture.
 // Runs locally on phone/desktop with zero external API latency.
 
-import { todayISO } from './model.js';
-
-const NOTEBOOK_RE = /(本子|笔记本|手账|错题本|草稿本|活页本|文件夹|档案袋|资料夹|记事本)/;
-const CONSUMABLE_RE = /(咖啡|茶|零食|食品|药|维生素|护肤|面霜|防晒|面膜|洗面奶|洗发|沐浴|护发|牙膏|护理液|滤芯|电池|胶水|试剂|手套|口罩|纸巾|券|卡|隐形眼镜|滴眼液)/;
-const SEASONAL_RE = /(泳裤|泳镜|泳帽|羽绒服|大衣|围巾|冲锋衣|雨伞|雨衣|行李箱|转换插头|暖宝宝|护膝|雪镜)/;
-const LAB_RE = /(护目镜|安全眼镜|实验服|白大褂|镊子|游标卡尺|移液器|U盘|读卡器|探针|芯片)/;
+import { classifyText, todayISO } from './model.js';
 
 function resolveDateToken(str, now = new Date()) {
   const y = now.getFullYear();
@@ -36,11 +31,13 @@ function resolveDateToken(str, now = new Date()) {
 }
 
 export function inferTypeAndDomain(text) {
-  if (NOTEBOOK_RE.test(text)) return { item_type: 'notebook', domain: '实体本子', unit: '本' };
-  if (LAB_RE.test(text)) return { item_type: 'durable', domain: '科研个人装备', unit: '件' };
-  if (SEASONAL_RE.test(text)) return { item_type: 'seasonal', domain: '穿搭运动', unit: '件' };
-  if (CONSUMABLE_RE.test(text)) return { item_type: 'consumable', domain: '生活', unit: '件' };
-  return { item_type: 'durable', domain: '生活', unit: '件' };
+  const res = classifyText(text);
+  return {
+    item_type: res.item_type,
+    domain: res.domain,
+    category: res.category,
+    unit: res.unit,
+  };
 }
 
 function normalizeInlineLocation(rawLoc) {
@@ -97,7 +94,7 @@ export function parseQuickText(input, now = new Date()) {
   }
 
   // 2. Unopened count (e.g. "2瓶未拆", "未拆封1盒")
-  const unopM = text.match(/(\d+)\s*(?:个|件|副|条|本|瓶|盒|袋|包|支|罐|桶|张|套|双|把)?\s*(?:未拆封|未拆|全新|没拆)/)
+  const unopM = text.match(/(\d+)\s*(?:个|件|副|条|本|瓶|盒|袋|包|支|罐|桶|张|套|双|把|节)?\s*(?:未拆封|未拆|全新|没拆)/)
     || text.match(/(?:未拆封|未拆|全新|没拆)\s*(\d+)/);
   if (unopM) {
     unopenedQty = parseInt(unopM[1], 10) || 0;
@@ -119,8 +116,8 @@ export function parseQuickText(input, now = new Date()) {
     text = text.replace(codeM[0], ' ');
   }
 
-  // 4. Quantity + unit (e.g. "2瓶", "1副", "x3")
-  const qtyM = text.match(/(?:数量[:：]?\s*|x|×|\*)?(\d+(?:\.\d+)?)\s*(副|条|本|瓶|盒|袋|包|支|罐|桶|张|套|双|把|台|块|件|个)/)
+  // 4. Quantity + unit (e.g. "2瓶", "1副", "4节", "x3")
+  const qtyM = text.match(/(?:数量[:：]?\s*|x|×|\*)?(\d+(?:\.\d+)?)\s*(副|条|本|瓶|盒|袋|包|支|罐|桶|张|套|双|把|台|块|节|件|个)/)
     || text.match(/(?:x|×|\*)\s*(\d+(?:\.\d+)?)\b/);
   if (qtyM) {
     qty = Number(qtyM[1]) || 1;
@@ -148,6 +145,7 @@ export function parseQuickText(input, now = new Date()) {
     current_location: location || '家 > 未分格 > 默认 [H-00]',
     item_type: inferred.item_type,
     domain: inferred.domain,
+    category: inferred.category,
     use_by: useBy,
     remind_use_on: remindUseOn,
     need_buy: needBuy,

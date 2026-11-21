@@ -1,4 +1,4 @@
-const VERSION = 'itemvault-v4';
+const VERSION = 'itemvault-v5';
 const SHELL = [
   './',
   'index.html',
