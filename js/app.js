@@ -6,6 +6,7 @@ import {
   getIdleRadar,
   getSubcategoriesForDomain,
   getToBuyItems,
+  resolveItemTaxonomy,
   todayISO,
 } from './model.js';
 import { parseQuickText } from './parser.js';
@@ -79,6 +80,7 @@ const ui = {
   addTab: 'quick',
   quickText: '',
   formName: '',
+  formSeed: null,
 };
 
 applyTheme(ui.theme, false);
@@ -237,7 +239,7 @@ async function runMutation(type, payload, okMsg) {
     toast('当前为只读搜索模式（如需修改请在设置里关闭只读）');
     return false;
   }
-  toast(okMsg);
+  if (okMsg) toast(okMsg);
   return true;
 }
 
@@ -424,9 +426,45 @@ document.addEventListener('click', async (e) => {
   } else if (act === 'open-add') {
     if (store.isReadOnly) { toast('当前为只读搜索模式'); return; }
     ui.modal = { kind: 'add' };
+    ui.addTab = 'quick';
     ui.quickText = '';
     ui.formName = '';
+    ui.formSeed = null;
     render();
+  } else if (act === 'open-clone') {
+    if (store.isReadOnly) { toast('当前为只读搜索模式'); return; }
+    const it = store.state.itemsDoc.items.find((x) => x.id === id);
+    if (!it) return;
+    const tax = resolveItemTaxonomy(it);
+    ui.addTab = 'form';
+    ui.formName = it.name;
+    ui.formSeed = {
+      id: it.id,
+      name: it.name,
+      aliases: it.aliases || [],
+      desc: '',
+      domain: tax.domain,
+      category: tax.category,
+      item_type: it.item_type || 'durable',
+      unit: it.unit || '件',
+      existingLoc: it.current_location || it.home_location || '未知位置',
+    };
+    ui.modal = { kind: 'add' };
+    render();
+    document.querySelector('#form-add-form input[name="location"]')?.focus();
+  } else if (act === 'quick-remove') {
+    if (store.isReadOnly) { toast('当前为只读搜索模式'); return; }
+    const it = store.state.itemsDoc.items.find((x) => x.id === id);
+    if (!it) return;
+    if (await runMutation('retire_item', { id }, '')) {
+      toast(`已移除「${it.name}」`, { label: '撤销', act: 'undo-remove', id });
+    }
+  } else if (act === 'undo-remove') {
+    if (store.isReadOnly) { toast('当前为只读搜索模式'); return; }
+    document.getElementById('toast')?.classList.remove('show');
+    await runMutation('restore_item', { id }, '已撤销移除');
+  } else if (act === 'confirm-preset') {
+    await runMutation('confirm_preset', { id }, '已确认为自有物品');
   } else if (act === 'add-tab') {
     if (ui.addTab === btn.dataset.tab) return;
     ui.addTab = btn.dataset.tab;
@@ -514,11 +552,13 @@ document.addEventListener('click', async (e) => {
   } else if (act === 'close-backdrop') {
     if (e.target === btn && (backdropDown || e.detail === 0) && !isComposingActive()) {
       ui.modal = null;
+      ui.formSeed = null;
       render();
     }
     backdropDown = false;
   } else if (act === 'close-modal') {
     ui.modal = null;
+    ui.formSeed = null;
     render();
   }
 });
@@ -613,9 +653,11 @@ document.addEventListener('submit', async (e) => {
     await runMutation('add_item', parsed, `已入库：${parsed.name}`);
   } else if (form.id === 'form-add-form') {
     const fd = new FormData(form);
+    const seed = ui.formSeed;
     const type = fd.get('item_type') || 'durable';
     const payload = {
       name: fd.get('name'),
+      aliases: seed?.aliases || [],
       desc: fd.get('desc'),
       domain: fd.get('domain') || '',
       category: fd.get('category') || '',
@@ -630,9 +672,11 @@ document.addEventListener('submit', async (e) => {
       remind_use_on: fd.get('remind_use_on') || null,
       remind_buy_on: fd.get('remind_buy_on') || null,
       need_buy: fd.get('need_buy') === 'on',
-      curation: 'raw',
+      curation: seed ? 'curated' : 'raw',
+      source: 'user',
       notebook_meta: type === 'notebook' ? { topics: fd.get('nb_topics') || '' } : null,
     };
+    ui.formSeed = null;
     ui.modal = null;
     await runMutation('add_item', payload, `已入库：${payload.name}`);
   } else if (form.id === 'custom-move-form') {
@@ -671,6 +715,8 @@ document.addEventListener('submit', async (e) => {
         archived_to_enotes: fd.get('nb_archived') === 'on',
       } : null,
     };
+    if (fd.get('mark_curated') === 'on') patch.curation = 'curated';
+    if (fd.get('mark_user') === 'on') patch.source = 'user';
     ui.modal = null;
     await runMutation('update_item', { id, patch }, '修改已保存');
   } else if (form.id === 'settings-form') {

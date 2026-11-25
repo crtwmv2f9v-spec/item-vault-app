@@ -85,13 +85,17 @@ export function renderSyncBadge(store) {
   return `<button class="sync-pill ok" data-act="sync-now">${store.isReadOnly ? '只读已同步' : '已同步'}</button>`;
 }
 
-export function toast(msg) {
+export function toast(msg, action = null) {
   const el = document.getElementById('toast');
   if (!el) return;
-  el.textContent = msg;
+  if (action && action.act && action.label) {
+    el.innerHTML = `<span>${esc(msg)}</span><button type="button" class="toast-act" data-act="${esc(action.act)}" data-id="${esc(action.id || '')}">${esc(action.label)}</button>`;
+  } else {
+    el.textContent = msg;
+  }
   el.classList.add('show');
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => el.classList.remove('show'), 2600);
+  toast._t = setTimeout(() => el.classList.remove('show'), action ? 5000 : 2600);
 }
 
 function formatLocationHtml(locStr) {
@@ -103,8 +107,10 @@ function formatLocationHtml(locStr) {
   return `<span class="loc-path">${esc(pretty)}</span>${code ? `<span class="loc-code-chip">${esc(code)}</span>` : ''}`;
 }
 
-function badgesFor(it, today) {
+function badgesFor(it, today, opts = {}) {
   const out = [];
+  if (it.source === 'preset') out.push('<span class="badge badge-preset">预填</span>');
+  else if (opts.showSourceBadge) out.push('<span class="badge badge-user">自填</span>');
   if (it.notebook_meta?.code) out.push(`<span class="badge badge-nb">${esc(it.notebook_meta.code)}</span>`);
   if (it.current_location && it.home_location && it.current_location !== it.home_location) {
     out.push('<span class="badge badge-away">带出中</span>');
@@ -130,6 +136,7 @@ function badgesFor(it, today) {
 
 export function renderItemCard(it, today, opts = {}) {
   const readOnly = Boolean(opts.readOnly);
+  const isPreset = it.source === 'preset';
   const tax = resolveItemTaxonomy(it);
   const away = it.home_location && it.current_location && it.home_location !== it.current_location;
   const loc = it.current_location || it.home_location || '';
@@ -139,10 +146,10 @@ export function renderItemCard(it, today, opts = {}) {
     ? `<div class="card-nb">${esc(nb.cover || '实体本子')}${nb.topics?.length ? ` · ${esc(nb.topics.join('、'))}` : ''} · <strong>${nb.archived_to_enotes ? '已归档 e-notes' : '未电子化'}</strong></div>`
     : '';
   const extraLine = opts.extraNote ? `<div class="card-extra">${esc(opts.extraNote)}</div>` : '';
-  const statusBadges = badgesFor(it, today);
+  const statusBadges = badgesFor(it, today, opts);
 
   return `
-    <article class="card dom-${esc(tax.key)}" data-id="${esc(it.id)}" data-domain="${esc(tax.domain)}">
+    <article class="card dom-${esc(tax.key)}${isPreset ? ' is-preset' : ''}" data-id="${esc(it.id)}" data-domain="${esc(tax.domain)}">
       <div class="card-head">
         <div class="card-title-row">
           <button class="card-title" data-act="open-edit" data-id="${esc(it.id)}">${esc(it.name)}</button>
@@ -163,6 +170,8 @@ export function renderItemCard(it, today, opts = {}) {
       ${extraLine}
       ${readOnly ? '' : `
       <div class="card-actions">
+        ${isPreset ? `<button class="btn-chip btn-remove" data-act="quick-remove" data-id="${esc(it.id)}">我没有</button><button class="btn-chip btn-sage" data-act="confirm-preset" data-id="${esc(it.id)}">确认已有</button>` : ''}
+        <button class="btn-chip" data-act="open-clone" data-id="${esc(it.id)}">+补位置</button>
         <button class="btn-chip" data-act="open-move" data-id="${esc(it.id)}">换位置</button>
         ${away ? `<button class="btn-chip btn-accent" data-act="return-home" data-id="${esc(it.id)}">归位</button>` : ''}
         ${(it.item_type === 'consumable' || (it.qty || 0) > 1) ? `<button class="btn-chip" data-act="dec" data-id="${esc(it.id)}">-1</button>` : ''}
@@ -186,6 +195,8 @@ export function renderWelcomeStrip(store) {
   const buyCount = getToBuyItems(items).length;
   const awayCount = active.filter((it) => it.home_location && it.current_location && it.home_location !== it.current_location).length;
   const rawCount = active.filter((it) => it.curation === 'raw').length;
+  const presetCount = active.filter((it) => it.source === 'preset').length;
+  const userCount = active.length - presetCount;
 
   const h = new Date().getHours();
   const greet = h < 11 ? '早安，物品各归其位' : (h < 18 ? '手边好物，井井有条' : '晚安，小仓灯火温暖');
@@ -195,7 +206,12 @@ export function renderWelcomeStrip(store) {
   if (buyCount > 0) pills.push(`<button class="calm-pill is-warn" data-act="nav" data-route="buy">待买 ${buyCount}</button>`);
   if (awayCount > 0) pills.push(`<button class="calm-pill is-info" data-act="set-filter" data-filter="away" data-reset-domain="1">带出 ${awayCount}</button>`);
   if (rawCount > 0) pills.push(`<button class="calm-pill is-neutral" data-act="set-filter" data-filter="raw" data-reset-domain="1">待整理 ${rawCount}</button>`);
+  if (presetCount > 0) pills.push(`<button class="calm-pill is-preset" data-act="set-filter" data-filter="preset" data-reset-domain="1">预填 ${presetCount}</button>`);
   if (!pills.length) pills.push('<span class="calm-pill is-ok">一切清爽</span>');
+
+  const subText = presetCount > 0
+    ? `在库 <strong>${active.length}</strong> 件（自填 <strong>${userCount}</strong> · 预填 <strong>${presetCount}</strong>）· <strong>${activeDomainCount}</strong> 个分类`
+    : `在库 <strong>${active.length}</strong> 件 · <strong>${activeDomainCount}</strong> 个分类`;
 
   return `
     <div class="welcome-strip">
@@ -203,7 +219,7 @@ export function renderWelcomeStrip(store) {
         <span class="welcome-emblem">${ICONS.warmHome}</span>
         <div class="welcome-copy">
           <div class="welcome-title">${greet}</div>
-          <div class="welcome-sub">在库 <strong>${active.length}</strong> 件 · <strong>${activeDomainCount}</strong> 个分类</div>
+          <div class="welcome-sub">${subText}</div>
         </div>
       </div>
       <div class="welcome-pills">${pills.join('')}</div>
@@ -260,6 +276,8 @@ export function renderSpaceFilterRow(store, ui) {
   const f = ui.searchFilter || 'all';
   const filters = [
     { id: 'all', label: '全部地点' },
+    { id: 'user', label: '自填' },
+    { id: 'preset', label: '预填' },
     { id: 'home', label: '家' },
     { id: 'office', label: '办公室' },
     { id: 'lab', label: '实验室' },
@@ -275,6 +293,7 @@ export function renderSearchResults(store, ui) {
   const today = todayISO();
   const readOnly = Boolean(store.isReadOnly);
   const active = getActiveItems(store.state.itemsDoc.items);
+  const hasPreset = active.some((it) => it.source === 'preset');
   const q = ui.searchQuery || '';
   const f = ui.searchFilter || 'all';
   const df = ui.domainFilter || 'all';
@@ -286,6 +305,8 @@ export function renderSearchResults(store, ui) {
       if (df !== 'all' && tax.domain !== df) return false;
       if (df !== 'all' && cf !== 'all' && tax.category !== cf) return false;
       const loc = `${it.current_location || ''} ${it.home_location || ''}`;
+      if (f === 'user') return it.source !== 'preset';
+      if (f === 'preset') return it.source === 'preset';
       if (f === 'home') return loc.includes('家') || loc.includes('宿舍');
       if (f === 'office') return loc.includes('办公室') || loc.includes('工位');
       if (f === 'lab') return loc.includes('实验室');
@@ -305,7 +326,7 @@ export function renderSearchResults(store, ui) {
     const bar = hasFilter
       ? `<div class="result-meta"><span>找到 ${filtered.length} 件物品</span><button class="link-btn" data-act="reset-filters">重置筛选</button></div>`
       : '';
-    return `${bar}<div class="card-list">${filtered.map(({ it }) => renderItemCard(it, today, { readOnly })).join('')}</div>`;
+    return `${bar}<div class="card-list">${filtered.map(({ it }) => renderItemCard(it, today, { readOnly, showSourceBadge: hasPreset })).join('')}</div>`;
   }
 
   return `
@@ -341,7 +362,9 @@ export function renderSearchView(store, ui) {
 export function renderExpiringView(store) {
   const today = todayISO();
   const readOnly = Boolean(store.isReadOnly);
-  const list = getExpiringItems(store.state.itemsDoc.items, today);
+  const items = store.state.itemsDoc.items;
+  const hasPreset = getActiveItems(items).some((it) => it.source === 'preset');
+  const list = getExpiringItems(items, today);
   return `
     <section class="panel">
       <div class="sec-head">
@@ -352,7 +375,7 @@ export function renderExpiringView(store) {
         ? `<div class="card-list">${list.map(({ item, daysLeft }) => {
             const note = daysLeft < 0 ? `已超出目标日期 ${-daysLeft} 天（${item.use_by}）`
               : (daysLeft === 0 ? `今天是目标期限（${item.use_by}）` : `距离目标期限 ${item.use_by} 还有 ${daysLeft} 天`);
-            return renderItemCard(item, today, { extraNote: note, readOnly });
+            return renderItemCard(item, today, { extraNote: note, readOnly, showSourceBadge: hasPreset });
           }).join('')}</div>`
         : `<div class="empty-box"><div class="empty-art">${ICONS.shelfEmpty}</div><p>暂无设置限期用完（use_by）的物品，安心慢用。</p></div>`}
     </section>`;
@@ -361,7 +384,9 @@ export function renderExpiringView(store) {
 export function renderIdleView(store) {
   const today = todayISO();
   const readOnly = Boolean(store.isReadOnly);
-  const { unopened, idle, unverified } = getIdleRadar(store.state.itemsDoc.items, today);
+  const items = store.state.itemsDoc.items;
+  const hasPreset = getActiveItems(items).some((it) => it.source === 'preset');
+  const { unopened, idle, unverified } = getIdleRadar(items, today);
   return `
     <section class="panel">
       <div class="sec-head">
@@ -370,17 +395,17 @@ export function renderIdleView(store) {
       </div>
       <h3 class="subhead">未拆封 / 未使用囤货（${unopened.length}）</h3>
       ${unopened.length
-        ? `<div class="card-list">${unopened.map((it) => renderItemCard(it, today, { extraNote: `未拆封 ${it.unopened_qty || it.qty}${it.unit || '件'}，优先消耗`, readOnly })).join('')}</div>`
+        ? `<div class="card-list">${unopened.map((it) => renderItemCard(it, today, { extraNote: `未拆封 ${it.unopened_qty || it.qty}${it.unit || '件'}，优先消耗`, readOnly, showSourceBadge: hasPreset })).join('')}</div>`
         : '<p class="muted-empty">暂无未拆封囤货。</p>'}
 
       <h3 class="subhead">超期吃灰（${idle.length}）</h3>
       ${idle.length
-        ? `<div class="card-list">${idle.map(({ item, idleDays }) => renderItemCard(item, today, { extraNote: `已 ${idleDays} 天未记录使用`, readOnly })).join('')}</div>`
+        ? `<div class="card-list">${idle.map(({ item, idleDays }) => renderItemCard(item, today, { extraNote: `已 ${idleDays} 天未记录使用`, readOnly, showSourceBadge: hasPreset })).join('')}</div>`
         : '<p class="muted-empty">暂无超期吃灰物品。</p>'}
 
       <h3 class="subhead">超 180 天未核实位置（${unverified.length}）</h3>
       ${unverified.length
-        ? `<div class="card-list">${unverified.map(({ item, days }) => renderItemCard(item, today, { extraNote: `上次核实位置已过去 ${days} 天`, showVerify: true, readOnly })).join('')}</div>`
+        ? `<div class="card-list">${unverified.map(({ item, days }) => renderItemCard(item, today, { extraNote: `上次核实位置已过去 ${days} 天`, showVerify: true, readOnly, showSourceBadge: hasPreset })).join('')}</div>`
         : '<p class="muted-empty">所有物品位置均在 180 天内核实过。</p>'}
     </section>`;
 }
@@ -388,7 +413,9 @@ export function renderIdleView(store) {
 export function renderBuyView(store) {
   const today = todayISO();
   const readOnly = Boolean(store.isReadOnly);
-  const list = getToBuyItems(store.state.itemsDoc.items);
+  const items = store.state.itemsDoc.items;
+  const hasPreset = getActiveItems(items).some((it) => it.source === 'preset');
+  const list = getToBuyItems(items);
   return `
     <section class="panel">
       <div class="sec-head">
@@ -401,7 +428,7 @@ export function renderBuyView(store) {
             if (it.remind_buy_on) parts.push(`提醒购买日：${it.remind_buy_on}`);
             if (it.buy_note) parts.push(`备注：${it.buy_note}`);
             if ((it.unopened_qty || 0) > 0) parts.push(`注意：库中还有 ${it.unopened_qty} 件未拆封`);
-            return renderItemCard(it, today, { extraNote: parts.join(' | '), showBought: true, readOnly });
+            return renderItemCard(it, today, { extraNote: parts.join(' | '), showBought: true, readOnly, showSourceBadge: hasPreset });
           }).join('')}</div>`
         : `<div class="empty-box"><div class="empty-art">${ICONS.shelfEmpty}</div><p>当前没有待采购或低库存物品，家中常备充足。</p></div>`}
     </section>`;
@@ -411,6 +438,7 @@ export function renderMapView(store, locCode = '') {
   const today = todayISO();
   const readOnly = Boolean(store.isReadOnly);
   const items = store.state.itemsDoc.items;
+  const hasPreset = getActiveItems(items).some((it) => it.source === 'preset');
   const groups = getContainerGroups(items, store.state.locsDoc.locations);
 
   if (locCode) {
@@ -425,7 +453,7 @@ export function renderMapView(store, locCode = '') {
         </div>
         <h2 class="loc-detail-title"><span class="code-pill">${esc(code)}</span> ${esc(grp?.label || code)}</h2>
         ${matched.length
-          ? `<div class="card-list">${matched.map((it) => renderItemCard(it, today, { readOnly })).join('')}</div>`
+          ? `<div class="card-list">${matched.map((it) => renderItemCard(it, today, { readOnly, showSourceBadge: hasPreset })).join('')}</div>`
           : `<div class="empty-box"><div class="empty-art">${ICONS.shelfEmpty}</div><p>该容器内当前没有物品。</p></div>`}
       </section>`;
   }
@@ -477,7 +505,7 @@ export function renderMapView(store, locCode = '') {
         <span class="muted">记录书脊号、封面、主题与电子化归档状态</span>
       </div>
       ${nbs.length
-        ? `<div class="card-list">${nbs.map((it) => renderItemCard(it, today, { readOnly })).join('')}</div>`
+        ? `<div class="card-list">${nbs.map((it) => renderItemCard(it, today, { readOnly, showSourceBadge: hasPreset })).join('')}</div>`
         : '<p class="muted-empty">暂无录入的实体本子。</p>'}
     </section>`;
 }
@@ -539,7 +567,8 @@ export function renderFormTaxHint(name, opts = {}) {
 }
 
 export function renderQuickAddModal(store, state) {
-  const tab = state.addTab || 'quick';
+  const seed = state.formSeed || null;
+  const tab = seed ? 'form' : (state.addTab || 'quick');
   const rawText = state.quickText || '';
   const parsed = tab === 'quick' ? parseQuickText(rawText) : null;
   const dupQuery = tab === 'quick' ? (parsed?.name || '') : (state.formName || '');
@@ -553,14 +582,16 @@ export function renderQuickAddModal(store, state) {
     <div class="modal-backdrop" data-act="close-backdrop">
       <div class="modal" role="dialog" aria-modal="true">
         <div class="modal-head">
-          <h3>极简录入</h3>
+          <h3>${seed ? '补充同款位置' : '极简录入'}</h3>
           <button class="icon-btn" data-act="close-modal" aria-label="关闭">✕</button>
         </div>
-        <div class="seg-tabs">
-          <button class="${tab === 'quick' ? 'active' : ''}" data-act="add-tab" data-tab="quick">一句话速录</button>
-          <button class="${tab === 'form' ? 'active' : ''}" data-act="add-tab" data-tab="form">4 格表单</button>
-        </div>
-        <div id="add-dup-banner">${renderDupBanner(store, dupQuery)}</div>
+        ${seed
+          ? `<div class="clone-hint">已有位置：<b>${esc(seed.existingLoc)}</b>（请填写另一件的存放位置）</div>`
+          : `<div class="seg-tabs">
+               <button class="${tab === 'quick' ? 'active' : ''}" data-act="add-tab" data-tab="quick">一句话速录</button>
+               <button class="${tab === 'form' ? 'active' : ''}" data-act="add-tab" data-tab="form">4 格表单</button>
+             </div>`}
+        ${seed ? '' : `<div id="add-dup-banner">${renderDupBanner(store, dupQuery)}</div>`}
         ${tab === 'quick' ? `
           <form id="quick-add-form" class="form-stack">
             <textarea id="quick-text" rows="3" placeholder="例：化学护目镜 1副 放实验室个人抽屉 可套近视镜&#10;例：挂耳咖啡 2袋 家厨房柜 12月15日前用完 1袋未拆">${esc(rawText)}</textarea>
@@ -575,14 +606,14 @@ export function renderQuickAddModal(store, state) {
         ` : `
           <form id="form-add-form" class="form-stack">
             <label>物品名称 *<input id="form-add-name" name="name" required value="${esc(state.formName || '')}" placeholder="如：化学护目镜 / 泳裤 / 驾考错题本" /></label>
-            <div id="form-tax-hint" class="tax-hint">${renderFormTaxHint(state.formName || '')}</div>
-            <label>描述<input name="desc" placeholder="颜色、型号、特点或备注" /></label>
+            <div id="form-tax-hint" class="tax-hint">${renderFormTaxHint(state.formName || '', seed ? { domain: seed.domain, category: seed.category, itemType: seed.item_type } : {})}</div>
+            <label>描述<input name="desc" value="${esc(seed?.desc || '')}" placeholder="颜色、型号、特点或备注（如：客厅备用 / 主卧款）" /></label>
             <div class="row-2">
               <label>数量<input name="qty" type="number" step="any" min="0" value="1" /></label>
-              <label>单位<input name="unit" placeholder="留空自动识别（件/台/本/包）" value="" /></label>
+              <label>单位<input name="unit" placeholder="留空自动识别（件/台/本/包）" value="${esc(seed?.unit || '')}" /></label>
             </div>
             <label>储存地点 *
-              <input name="location" list="loc-datalist" placeholder="如：家 > 衣柜 > 运动抽屉 或 办公室铁柜" required />
+              <input name="location" list="loc-datalist" placeholder="如：家 > 卧室 > 床头柜 或 办公室铁柜" required />
               <datalist id="loc-datalist">${locs.map((l) => `<option value="${esc(l.label)}"></option>`).join('')}</datalist>
             </label>
             <details class="adv-box">
@@ -592,11 +623,11 @@ export function renderQuickAddModal(store, state) {
                   <label>一级大类
                     <select name="domain" data-cat-list="form-cat-datalist">
                       <option value="">自动识别</option>
-                      ${TAXONOMY.map((d) => `<option value="${esc(d.name)}">${esc(d.name)}</option>`).join('')}
+                      ${TAXONOMY.map((d) => `<option value="${esc(d.name)}" ${seed?.domain === d.name ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}
                     </select>
                   </label>
                   <label>二级子类
-                    <input name="category" list="form-cat-datalist" placeholder="留空自动识别" />
+                    <input name="category" list="form-cat-datalist" value="${esc(seed?.category || '')}" placeholder="留空自动识别" />
                     <datalist id="form-cat-datalist">${allDefaultSubs.map((c) => `<option value="${esc(c)}"></option>`).join('')}</datalist>
                   </label>
                 </div>
@@ -604,10 +635,10 @@ export function renderQuickAddModal(store, state) {
                   <label>管理类型
                     <select name="item_type">
                       <option value="">自动识别</option>
-                      <option value="durable">耐用常备</option>
-                      <option value="notebook">实体本子</option>
-                      <option value="consumable">消耗/囤货</option>
-                      <option value="seasonal">季节/场景</option>
+                      <option value="durable" ${seed?.item_type === 'durable' ? 'selected' : ''}>耐用常备</option>
+                      <option value="notebook" ${seed?.item_type === 'notebook' ? 'selected' : ''}>实体本子</option>
+                      <option value="consumable" ${seed?.item_type === 'consumable' ? 'selected' : ''}>消耗/囤货</option>
+                      <option value="seasonal" ${seed?.item_type === 'seasonal' ? 'selected' : ''}>季节/场景</option>
                     </select>
                   </label>
                   <label>未拆封数<input name="unopened_qty" type="number" min="0" value="0" /></label>
@@ -647,7 +678,7 @@ export function renderMoveModal(store, itemId) {
         </div>
         <p class="muted" style="margin:0 0 10px;">当前：${esc(it.current_location)}</p>
         <div class="spot-list">
-          ${spots.slice(0, 10).map((sp) => `
+          ${spots.slice(0, 24).map((sp) => `
             <button class="spot-btn ${sp === it.current_location ? 'active' : ''}" data-act="do-move" data-id="${esc(it.id)}" data-loc="${esc(sp)}">
               ${sp === it.home_location ? '★ ' : ''}${esc(sp)}
             </button>`).join('')}
@@ -717,6 +748,7 @@ export function renderEditModal(store, itemId) {
           </div>
           <label>采购备注<input name="buy_note" value="${esc(it.buy_note || '')}" /></label>
           <label class="chk-row"><input type="checkbox" name="need_buy" ${it.need_buy ? 'checked' : ''} /> 在采购清单中</label>
+          ${it.source === 'preset' ? '<label class="chk-row"><input type="checkbox" name="mark_user" /> 确认已有（转为自填，移除「预填」标记）</label>' : ''}
           ${it.curation === 'raw' ? '<label class="chk-row"><input type="checkbox" name="mark_curated" /> 标记为已整理（移除「待整理」标签）</label>' : ''}
           <div class="nb-section" id="edit-nb-section"${it.item_type === 'notebook' ? '' : ' hidden'}>
             <div class="row-2">
@@ -746,6 +778,7 @@ export function renderDetailModal(store, itemId) {
   const tax = resolveItemTaxonomy(it);
   const rows = [
     ['编号', it.id],
+    ['来源', it.source === 'preset' ? '默认预填（待核对）' : '本人自填'],
     ['数量', `${it.qty ?? 0}${it.unit || '件'}${(it.unopened_qty || 0) > 0 ? `（未拆 ${it.unopened_qty}）` : ''}`],
     ['科学分类', `${tax.domain}${tax.category ? ` · ${tax.category}` : ''}`],
     ['管理类型', TYPE_LABELS[it.item_type] || it.item_type || ''],

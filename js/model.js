@@ -16,35 +16,35 @@ export const TAXONOMY = [
     name: '数码影音',
     short: '数码',
     desc: '电脑、影音主机、外设与线材',
-    subcategories: ['电脑设备', '手机平板', '影音娱乐', '充电线材', '存储外设', '摄影配件'],
+    subcategories: ['电脑设备', '手机平板', '影音娱乐', '充电线材', '存储外设', '摄影配件', '网络智能'],
   },
   {
     key: 'home',
     name: '居家日用',
     short: '居家',
-    desc: '清洁纸品、收纳、厨具与维修工具',
-    subcategories: ['清洁纸品', '居家收纳', '厨房器具', '生活家电', '维修工具', '日常杂项'],
+    desc: '家具家纺、家电厨具、清洁收纳与维修工具',
+    subcategories: ['家具灯具', '家纺床品', '生活家电', '厨房器具', '清洁纸品', '居家收纳', '维修工具', '日常杂项'],
   },
   {
     key: 'care',
     name: '个护健康',
     short: '个护',
     desc: '护肤防晒、洗护、眼部与常备药品',
-    subcategories: ['护肤防晒', '洗护清洁', '眼部护理', '常备药品', '保健营养', '个人仪容'],
+    subcategories: ['护肤防晒', '洗护清洁', '眼部护理', '个人仪容', '常备药品', '保健营养'],
   },
   {
     key: 'food',
     name: '饮食茶咖',
     short: '饮食',
-    desc: '咖啡茶饮、零食粮油与便携水杯',
-    subcategories: ['咖啡茶饮', '零食坚果', '粮油调味', '冲调饮品', '便携水杯'],
+    desc: '咖啡茶饮、酒水饮料、生鲜零食与便携水杯',
+    subcategories: ['咖啡茶饮', '酒水饮料', '冲调饮品', '零食坚果', '粮油调味', '生鲜速食', '便携水杯'],
   },
   {
     key: 'apparel',
     name: '穿搭运动',
     short: '穿搭',
-    desc: '运动游泳、换季衣物、鞋包与差旅',
-    subcategories: ['游泳水上', '运动健身', '换季衣物', '鞋包配饰', '差旅装备'],
+    desc: '日常换季衣物、内衣家居、运动游泳、鞋包与差旅',
+    subcategories: ['日常衣物', '换季衣物', '内衣家居', '鞋包配饰', '运动健身', '游泳水上', '差旅装备'],
   },
   {
     key: 'stationery',
@@ -64,8 +64,8 @@ export const TAXONOMY = [
     key: 'other',
     name: '其他备用',
     short: '其他',
-    desc: '纪念收藏、礼品与待归类物品',
-    subcategories: ['纪念收藏', '礼品备用', '待归类'],
+    desc: '纪念收藏、礼品、应急户外与待归类物品',
+    subcategories: ['纪念收藏', '礼品备用', '应急户外', '待归类'],
   },
 ];
 
@@ -97,65 +97,75 @@ const CLASSIFY_RULES = [
   { re: /(电脑包|相机包|书包)/i, domain: '穿搭运动', category: '鞋包配饰', item_type: 'durable', unit: '个' },
   { re: /(咖啡机|磨豆机)/i, domain: '居家日用', category: '生活家电', item_type: 'durable', unit: '台' },
   { re: /(保温杯|水杯|咖啡杯|随行杯|运动水壶|马克杯|茶壶|手冲壶)/i, domain: '饮食茶咖', category: '便携水杯', item_type: 'durable', unit: '个' },
-  { re: /(电动牙刷头|牙刷头)/i, domain: '个护健康', category: '洗护清洁', item_type: 'consumable', unit: '支' },
-  { re: /(剃须刀|吹风机|卷发棒|电动牙刷|冲牙器|指甲剪|梳子|化妆镜)/i, domain: '个护健康', category: '个人仪容', item_type: 'durable', unit: '件' },
-  { re: /(体温计|血压计|药盒)/i, domain: '个护健康', category: '常备药品', item_type: 'durable', unit: '件' },
+  { re: /(电动牙刷头|牙刷头|刷头)/i, domain: '个护健康', category: '洗护清洁', item_type: 'consumable', unit: '支' },
+  { re: /(剃须刀|吹风机|卷发棒|直发|电动牙刷|冲牙器|指甲剪|梳子|化妆镜|修剪器)/i, domain: '个护健康', category: '个人仪容', item_type: 'durable', unit: '件' },
+  { re: /(体温计|血压计|血氧仪|药盒|医药箱)/i, domain: '个护健康', category: '常备药品', item_type: 'durable', unit: '件' },
+  { re: /(路由器|光猫|交换机|智能音箱|智能插座|网关|网线)/i, domain: '数码影音', category: '网络智能', item_type: 'durable', unit: '个' },
 
   // 1. 数码影音 (checked before notebook so "笔记本电脑" is digital, never paper notebook)
-  { re: /(macbook|mbp|thinkpad|笔记本电脑|台式机|显示器|一体机|迷你主机|mac\s*mini|电脑|键盘|鼠标|触控板)/i, domain: '数码影音', category: '电脑设备', item_type: 'durable', unit: '台' },
-  { re: /(iphone|ipad|手机|平板|kindle|电纸书|电子书|apple\s*watch|智能手表|运动手环)/i, domain: '数码影音', category: '手机平板', item_type: 'durable', unit: '台' },
-  { re: /(switch|ps5|xbox|任天堂|游戏机|手柄|卡带|投影仪|当贝|音响|音箱|耳机|airpods|麦克风|电视)/i, domain: '数码影音', category: '影音娱乐', item_type: 'durable', unit: '台' },
-  { re: /(充电器|充电头|氮化镓|充电宝|移动电源|数据线|充电线|排插|插线板|转换插头|转接头|扩展坞|电源适配器)/i, domain: '数码影音', category: '充电线材', item_type: 'durable', unit: '个' },
-  { re: /(移动硬盘|固态硬盘|ssd|硬盘盒|u盘|优盘|sd卡|tf卡|内存卡|读卡器|路由器|网线)/i, domain: '数码影音', category: '存储外设', item_type: 'durable', unit: '个' },
+  { re: /(macbook|mbp|thinkpad|笔记本电脑|台式机|显示器|一体机|迷你主机|mac\s*mini|电脑|键盘|鼠标|触控板|打印机)/i, domain: '数码影音', category: '电脑设备', item_type: 'durable', unit: '台' },
+  { re: /(iphone|ipad|手机|平板|kindle|电纸书|电子书|apple\s*watch|智能手表|运动手环|手写笔)/i, domain: '数码影音', category: '手机平板', item_type: 'durable', unit: '台' },
+  { re: /(switch|ps5|xbox|任天堂|游戏机|手柄|卡带|投影仪|当贝|音响|音箱|耳机|airpods|麦克风|电视|遥控器)/i, domain: '数码影音', category: '影音娱乐', item_type: 'durable', unit: '台' },
+  { re: /(充电器|充电头|氮化镓|充电宝|移动电源|数据线|充电线|排插|插线板|转换插头|转接头|扩展坞|电源适配器|hdmi|无线充)/i, domain: '数码影音', category: '充电线材', item_type: 'durable', unit: '个' },
+  { re: /(移动硬盘|固态硬盘|ssd|机械硬盘|硬盘盒|u盘|优盘|sd卡|tf卡|内存卡|存储卡|读卡器|卡针)/i, domain: '数码影音', category: '存储外设', item_type: 'durable', unit: '个' },
   { re: /(相机|镜头|三脚架|稳定器|云台|拍立得|相纸|补光灯|滤镜)/i, domain: '数码影音', category: '摄影配件', item_type: 'durable', unit: '件' },
 
   // 2. 科研办公
   { re: /(护目镜|安全眼镜|防飞溅眼镜|goggles|实验服|白大褂|防毒面具|劳保手套|丁腈手套)/i, domain: '科研办公', category: '实验防护', item_type: 'durable', unit: '件' },
   { re: /(镊子|游标卡尺|卡尺|移液器|移液枪|探针|芯片|样品盒|载玻片|培养皿|离心管|烧杯|万用表|示波器)/i, domain: '科研办公', category: '科研工具', item_type: 'durable', unit: '件' },
   { re: /(试剂|滤膜|注射器|针头|封口膜|称量纸|擦镜纸|导电胶)/i, domain: '科研办公', category: '实验耗材', item_type: 'consumable', unit: '盒' },
-  { re: /(订书机|打孔机|美工刀|白板|计算器|印章|标签机)/i, domain: '科研办公', category: '办公器具', item_type: 'durable', unit: '件' },
+  { re: /(订书机|打孔机|计算器|印章|标签机|标签打印|小白板|白板|理线盒|屏幕清洁)/i, domain: '科研办公', category: '办公器具', item_type: 'durable', unit: '件' },
 
   // 3. 文具本册
   { re: /(手账|草稿本|日程本|计划本)/i, domain: '文具本册', category: '手账草稿', item_type: 'notebook', unit: '本' },
   { re: /(专用本|错题本|活页本|记事本|笔记本|本子|实验记录本|素描本)/i, domain: '文具本册', category: '专用本子', item_type: 'notebook', unit: '本' },
   { re: /(书立|文件盒)/i, domain: '文具本册', category: '文件夹册', item_type: 'durable', unit: '个' },
   { re: /(文件夹|档案袋|资料夹|风琴包|活页夹)/i, domain: '文具本册', category: '文件夹册', item_type: 'notebook', unit: '本' },
-  { re: /(教材|词典|辞典|参考书|小说|绘本|杂志|说明书|手册|书籍)/i, domain: '文具本册', category: '书籍资料', item_type: 'durable', unit: '本' },
-  { re: /(钢笔|圆珠笔|中性笔|签字笔|荧光笔|铅笔|橡皮|修正带|墨水|笔芯|便利贴|便签)/i, domain: '文具本册', category: '书写文具', item_type: 'durable', unit: '支' },
-  { re: /(护照|身份证|驾照|驾驶证|签证|毕业证|学位证|合同|发票|保修卡|门禁卡|公交卡|礼品卡|购物卡|会员卡|代金券|优惠券|购物券|抵用券|礼品券|体验券|门票)/i, domain: '文具本册', category: '证件卡券', item_type: 'durable', unit: '张' },
+  { re: /(教材|词典|辞典|参考书|工具书|小说|绘本|杂志|说明书|手册|书籍)/i, domain: '文具本册', category: '书籍资料', item_type: 'durable', unit: '本' },
+  { re: /(钢笔|圆珠笔|中性笔|签字笔|荧光笔|记号笔|铅笔|橡皮|修正带|墨水|笔芯|便利贴|便签|固体胶|长尾夹|回形针|尺子)/i, domain: '文具本册', category: '书写文具', item_type: 'durable', unit: '支' },
+  { re: /(护照|身份证|户口本|驾照|驾驶证|行驶证|社保卡|医保卡|银行卡|u盾|签证|毕业证|学位证|资格证|合同|发票|保修卡|保单|门禁卡|公交卡|礼品卡|购物卡|会员卡|代金券|优惠券|购物券|抵用券|礼品券|体验券|门票)/i, domain: '文具本册', category: '证件卡券', item_type: 'durable', unit: '张' },
 
   // 4. 饮食茶咖
-  { re: /(挂耳|咖啡|茶包|茶叶|绿茶|红茶|乌龙|抹茶|可可粉|奶茶|滤纸)/i, domain: '饮食茶咖', category: '咖啡茶饮', item_type: 'consumable', unit: '包' },
-  { re: /(零食|坚果|饼干|巧克力|糖果|麦片|燕麦|能量棒|果干|薯片)/i, domain: '饮食茶咖', category: '零食坚果', item_type: 'consumable', unit: '袋' },
-  { re: /(大米|面条|食用油|酱油|香料|调味|蜂蜜|果酱|番茄酱|方便面|意面|罐头|食品)/i, domain: '饮食茶咖', category: '粮油调味', item_type: 'consumable', unit: '件' },
-  { re: /(蛋白粉|奶粉|豆浆粉|电解质|冲剂|饮料|矿泉水|气泡水)/i, domain: '饮食茶咖', category: '冲调饮品', item_type: 'consumable', unit: '瓶' },
+  { re: /(挂耳|咖啡|茶包|茶叶|绿茶|红茶|乌龙|花草茶|抹茶|可可粉|奶茶|滤纸)/i, domain: '饮食茶咖', category: '咖啡茶饮', item_type: 'consumable', unit: '包' },
+  { re: /(矿泉水|气泡水|苏打水|无糖茶|碳酸饮料|果汁|椰子水|啤酒|葡萄酒|红酒|白酒|洋酒|果酒)/i, domain: '饮食茶咖', category: '酒水饮料', item_type: 'consumable', unit: '瓶' },
+  { re: /(纯牛奶|牛奶|燕麦奶|植物奶|酸奶|蛋白粉|奶粉|豆浆粉|黑芝麻糊|藕粉|电解质|泡腾片|冲剂)/i, domain: '饮食茶咖', category: '冲调饮品', item_type: 'consumable', unit: '瓶' },
+  { re: /(零食|坚果|饼干|曲奇|巧克力|糖果|口香糖|麦片|燕麦|能量棒|代餐棒|果干|红枣|肉脯|豆干|海苔|薯片)/i, domain: '饮食茶咖', category: '零食坚果', item_type: 'consumable', unit: '袋' },
+  { re: /(大米|杂粮|面粉|淀粉|面条|挂面|意面|粉丝|粉条|食用油|橄榄油|香油|食用盐|白糖|冰糖|红糖|酱油|生抽|老抽|料酒|食用醋|蚝油|辣椒酱|豆瓣酱|芝麻酱|沙拉酱|鸡精|胡椒粉|孜然|五香粉|花椒|八角|香菇|木耳|紫菜|虾皮|葱姜蒜|香料|调味|蜂蜜|果酱|番茄酱)/i, domain: '饮食茶咖', category: '粮油调味', item_type: 'consumable', unit: '件' },
+  { re: /(鸡蛋|方便面|泡面|螺蛳粉|拌面|自热|水饺|馄饨|汤圆|手抓饼|包子|馒头|午餐肉|罐头|面包|吐司|水果|蔬菜|雪糕|冰激凌|速冻)/i, domain: '饮食茶咖', category: '生鲜速食', item_type: 'consumable', unit: '件' },
 
   // 5. 个护健康
-  { re: /(隐形眼镜|美瞳|护理液|滴眼液|眼药水|洗眼液|蒸汽眼罩|眼镜布|防雾喷雾)/i, domain: '个护健康', category: '眼部护理', item_type: 'consumable', unit: '瓶' },
-  { re: /(防晒|隔离|面霜|乳液|精华|爽肤水|化妆水|面膜|卸妆|润唇膏|护手霜|身体乳|护肤|眼霜)/i, domain: '个护健康', category: '护肤防晒', item_type: 'consumable', unit: '支' },
-  { re: /(洗面奶|洁面|洗发|护发|沐浴|香皂|洗手液|牙膏|牙刷|牙线|漱口水|棉签|化妆棉|卫生巾|湿厕纸)/i, domain: '个护健康', category: '洗护清洁', item_type: 'consumable', unit: '瓶' },
-  { re: /(感冒药|退烧药|布洛芬|止痛药|消炎药|肠胃药|过敏药|创可贴|碘伏|酒精棉|棉片|药膏|药水|药片|胶囊|鼻喷|氯雷他定|口罩|药品)/i, domain: '个护健康', category: '常备药品', item_type: 'consumable', unit: '盒' },
+  { re: /(隐形眼镜|美瞳|护理液|滴眼液|眼药水|人工泪液|洗眼液|蒸汽眼罩|框架眼镜|眼镜盒|眼镜布|防雾)/i, domain: '个护健康', category: '眼部护理', item_type: 'consumable', unit: '瓶' },
+  { re: /(防晒|隔离|面霜|乳液|精华|爽肤水|化妆水|面膜|润唇膏|护手霜|身体乳|磨砂膏|芦荟胶|祛痘|护肤|眼霜)/i, domain: '个护健康', category: '护肤防晒', item_type: 'consumable', unit: '支' },
+  { re: /(洗面奶|洁面|卸妆|洗脸巾|洗发|护发|发膜|沐浴|搓澡|香皂|洗手液|牙膏|牙刷|牙线|漱口水|棉签|化妆棉|卫生巾|卫生护垫)/i, domain: '个护健康', category: '洗护清洁', item_type: 'consumable', unit: '瓶' },
+  { re: /(感冒药|退烧|布洛芬|止痛药|消炎药|止咳|肠胃药|蒙脱石|过敏药|氯雷他定|晕车|藿香|创可贴|碘伏|酒精棉|棉片|纱布|药膏|药水|药片|胶囊|鼻喷|风油精|清凉油|花露水|膏药|口罩|药品)/i, domain: '个护健康', category: '常备药品', item_type: 'consumable', unit: '盒' },
   { re: /(维生素|维c|鱼油|益生菌|褪黑素|叶黄素|钙片|辅酶|保健)/i, domain: '个护健康', category: '保健营养', item_type: 'consumable', unit: '瓶' },
-  { re: /(香水|止汗露)/i, domain: '个护健康', category: '个人仪容', item_type: 'consumable', unit: '瓶' },
+  { re: /(香水|止汗露|发蜡|定型喷雾)/i, domain: '个护健康', category: '个人仪容', item_type: 'consumable', unit: '瓶' },
 
   // 6. 穿搭运动
   { re: /(泳裤|游泳裤|泳装|泳衣|泳镜|泳帽|浮板|速干浴巾)/i, domain: '穿搭运动', category: '游泳水上', item_type: 'seasonal', unit: '件' },
-  { re: /(运动鞋|跑鞋|球拍|羽毛球|网球|篮球|瑜伽垫|弹力带|跳绳|护膝|护腕|雪镜|登山杖|哑铃)/i, domain: '穿搭运动', category: '运动健身', item_type: 'seasonal', unit: '件' },
+  { re: /(运动鞋|跑鞋|球拍|羽毛球|网球|篮球|足球|瑜伽垫|弹力带|泡沫轴|筋膜枪|跳绳|护膝|护腕|雪镜|登山杖|哑铃|壶铃)/i, domain: '穿搭运动', category: '运动健身', item_type: 'seasonal', unit: '件' },
   { re: /(暖宝宝)/i, domain: '穿搭运动', category: '换季衣物', item_type: 'consumable', unit: '包' },
-  { re: /(羽绒服|大衣|冲锋衣|毛衣|卫衣|风衣|外套|围巾|手套|帽子|保暖内衣|秋衣|睡衣|袜子|内衣)/i, domain: '穿搭运动', category: '换季衣物', item_type: 'seasonal', unit: '件' },
-  { re: /(行李箱|登机箱|洗漱包|眼罩|耳塞|u型枕|颈枕|分装瓶|晾衣绳)/i, domain: '穿搭运动', category: '差旅装备', item_type: 'seasonal', unit: '件' },
-  { re: /(背包|双肩包|通勤包|斜挎包|手提包|钱包|皮带|腰带|墨镜|太阳镜|雨伞|晴雨伞|雨衣|皮鞋|拖鞋)/i, domain: '穿搭运动', category: '鞋包配饰', item_type: 'durable', unit: '件' },
+  { re: /(羽绒服|大衣|冲锋衣|抓绒|厚毛衣|羊绒|毛衣|卫衣|风衣|外套|围巾|手套|帽子|保暖内衣|秋衣|防晒衣|冰袖)/i, domain: '穿搭运动', category: '换季衣物', item_type: 'seasonal', unit: '件' },
+  { re: /(内裤|内衣|袜子|打底背心|睡衣|家居服)/i, domain: '穿搭运动', category: '内衣家居', item_type: 'seasonal', unit: '件' },
+  { re: /(t恤|衬衫|牛仔裤|休闲长裤|运动长裤|西裤|短裤|夹克|西装)/i, domain: '穿搭运动', category: '日常衣物', item_type: 'seasonal', unit: '件' },
+  { re: /(行李箱|登机箱|洗漱包|洗漱收纳包|分装压缩|眼罩|耳塞|u型枕|颈枕|分装瓶|晾衣绳)/i, domain: '穿搭运动', category: '差旅装备', item_type: 'seasonal', unit: '件' },
+  { re: /(背包|双肩包|通勤包|公文包|斜挎包|手提包|托特包|钱包|卡包|皮带|腰带|墨镜|太阳镜|雨伞|晴雨伞|雨衣|鞋套|皮鞋|休闲鞋|靴子|拖鞋|洞洞鞋|凉鞋)/i, domain: '穿搭运动', category: '鞋包配饰', item_type: 'durable', unit: '件' },
 
   // 7. 居家日用
-  { re: /(纸巾|抽纸|卷纸|卫生纸|湿巾|厨房纸|洗衣液|洗衣凝珠|柔顺剂|洗洁精|洁厕|消毒液|除霉|垃圾袋|保鲜膜|保鲜袋|密封袋|抹布|百洁布|粘毛器)/i, domain: '居家日用', category: '清洁纸品', item_type: 'consumable', unit: '包' },
+  { re: /(床架|床垫|床头柜|衣柜|斗柜|穿衣镜|梳妆台|沙发|茶几|电视柜|边几|小推车|餐桌|餐椅|餐边柜|书桌|工学椅|书架|鞋柜|换鞋凳|置物架|储物架|折叠梯|人字梯|台灯|落地灯|小夜灯|氛围灯|感应灯|挂钟|电子钟)/i, domain: '居家日用', category: '家具灯具', item_type: 'durable', unit: '件' },
+  { re: /(四件套|床笠|保护垫|夏凉被|春秋被|冬被|羽绒被|被子|枕头|抱枕|靠垫|盖毯|窗帘|地毯|防滑吸水垫|毛巾|浴巾|干发帽|围裙|桌布|餐垫)/i, domain: '居家日用', category: '家纺床品', item_type: 'durable', unit: '件' },
+  { re: /(纸巾|抽纸|面巾纸|卷纸|卫生纸|湿巾|湿厕纸|厨房纸|吸油纸|洗衣液|洗衣凝珠|柔顺剂|衣领净|内衣清洗|留香珠|除菌液|洗洁精|重油污|洁厕|消毒液|酒精喷雾|地板清洁|玻璃清洁|疏通剂|除霉|垃圾袋|垃圾桶|保鲜膜|保鲜袋|密封袋|锡纸|油纸|抹布|百洁布|粘毛器|扫把|簸箕|拖把|马桶刷)/i, domain: '居家日用', category: '清洁纸品', item_type: 'consumable', unit: '包' },
   { re: /(滤芯|滤网)/i, domain: '居家日用', category: '生活家电', item_type: 'consumable', unit: '个' },
-  { re: /(吸尘器|加湿器|除湿机|风扇|电暖器|台灯|小夜灯|熨斗|挂烫机|烧水壶|电饭煲|空气炸锅)/i, domain: '居家日用', category: '生活家电', item_type: 'durable', unit: '台' },
-  { re: /(平底锅|汤锅|炒锅|菜刀|砧板|案板|饭盒|保鲜盒|削皮刀|开瓶器|厨房秤|电子秤|餐具)/i, domain: '居家日用', category: '厨房器具', item_type: 'durable', unit: '件' },
+  { re: /(冰箱|洗衣机|烘干机|空调|热水器|油烟机|燃气灶|微波炉|电磁炉|电压力锅|破壁机|榨汁机|三明治机|烤面包机|电烤箱|洗碗机|净水器|饮水机|扫地机|吸尘器|除螨仪|空气净化器|加湿器|除湿机|风扇|电暖器|熨斗|挂烫机|烧水壶|电热水壶|养生壶|电饭煲|空气炸锅|体脂秤|电蚊拍|灭蚊灯)/i, domain: '居家日用', category: '生活家电', item_type: 'durable', unit: '台' },
+  { re: /(平底锅|炒锅|汤锅|奶锅|蒸锅|菜刀|水果刀|厨房剪|磨刀器|砧板|案板|锅铲|汤勺|漏勺|饭碗|汤碗|菜盘|筷子|餐具|饭盒|保鲜盒|沥水篮|洗菜盆|隔热手套|防烫夹|削皮刀|开瓶器|厨房秤|量杯|油壶|调味罐|凉水壶|制冰盒)/i, domain: '居家日用', category: '厨房器具', item_type: 'durable', unit: '件' },
   { re: /(电池)/i, domain: '居家日用', category: '维修工具', item_type: 'consumable', unit: '节' },
-  { re: /(胶水|502|热熔胶|电工胶带|双面胶|胶带|扎带|挂钩|粘钩)/i, domain: '居家日用', category: '维修工具', item_type: 'consumable', unit: '件' },
-  { re: /(螺丝刀|内六角|扳手|钳子|卷尺|钉子|手电筒|剪刀|工具箱)/i, domain: '居家日用', category: '维修工具', item_type: 'durable', unit: '把' },
-  { re: /(干燥剂|除湿盒|樟脑丸)/i, domain: '居家日用', category: '居家收纳', item_type: 'consumable', unit: '盒' },
-  { re: /(收纳箱|收纳盒|储物盒|整理箱|真空压缩袋|压缩袋|衣架|裤架|鞋盒|防尘罩)/i, domain: '居家日用', category: '居家收纳', item_type: 'durable', unit: '个' },
+  { re: /(胶水|502|热熔胶|电工胶带|双面胶|纳米胶|封箱胶带|胶带|扎带|理线带|挂钩|粘钩|灯泡|润滑油)/i, domain: '居家日用', category: '维修工具', item_type: 'consumable', unit: '件' },
+  { re: /(螺丝刀|内六角|扳手|钳子|羊角锤|卷尺|测电笔|美工刀|拆箱刀|手电筒|剪刀|工具箱|针线盒|打火机|螺丝钉)/i, domain: '居家日用', category: '维修工具', item_type: 'durable', unit: '把' },
+  { re: /(干燥剂|除湿盒|樟脑丸|防虫|防霉片)/i, domain: '居家日用', category: '居家收纳', item_type: 'consumable', unit: '盒' },
+  { re: /(收纳箱|收纳盒|储物盒|整理箱|分隔盒|脏衣篮|压缩袋|衣架|裤架|鞋盒|鞋架|防尘罩|环保袋|购物袋)/i, domain: '居家日用', category: '居家收纳', item_type: 'durable', unit: '个' },
+
+  // 8. 其他备用
+  { re: /(应急包|灭火器|防火毯|野餐垫|露营椅|车载|挪车牌)/i, domain: '其他备用', category: '应急户外', item_type: 'durable', unit: '件' },
 ];
 
 export function classifyText(text, explicitType = '') {
@@ -418,10 +428,11 @@ export function nextNotebookCode(items) {
 export function itemBlob(it) {
   const nb = it.notebook_meta || {};
   const tax = resolveItemTaxonomy(it);
+  const srcKw = it.source === 'preset' ? '预填 preset' : '自填';
   return [
     it.id, it.name, ...(it.aliases || []), it.desc, it.domain, it.category,
     tax.domain, tax.category,
-    ...(it.tags || []), it.home_location, it.current_location, it.buy_note,
+    ...(it.tags || []), srcKw, it.home_location, it.current_location, it.buy_note,
     nb.code, nb.cover, ...(nb.topics || []), nb.contents_summary,
   ].filter(Boolean).join(' ').toLowerCase();
 }
@@ -551,6 +562,7 @@ export function buildRecord(raw, items, locsDoc, today = todayISO()) {
     remind_buy_on: validDate(raw.remind_buy_on),
     buy_note: String(raw.buy_note || '').trim(),
     curation: raw.curation === 'raw' ? 'raw' : 'curated',
+    source: raw.source === 'preset' ? 'preset' : 'user',
     notebook_meta: nbMeta,
   };
 }
@@ -609,6 +621,12 @@ export function applyOp(state, op) {
       if (patch.idle_review_days !== undefined) it.idle_review_days = Math.max(1, Number(patch.idle_review_days) || 90);
       if (patch.status) it.status = patch.status;
       if (patch.curation) it.curation = patch.curation;
+      if (patch.source === 'preset' || patch.source === 'user') {
+        it.source = patch.source;
+        if (it.source === 'user' && Array.isArray(it.tags)) {
+          it.tags = it.tags.filter((t) => t !== '预填');
+        }
+      }
       if (it.item_type === 'notebook') {
         const nb = { ...(it.notebook_meta || {}), ...(patch.notebook_meta || {}) };
         if (!nb.code) nb.code = nextNotebookCode(items);
@@ -724,6 +742,23 @@ export function applyOp(state, op) {
       hist = { ts: op.ts, op: 'enotes_toggle', id: it.id, archived: it.notebook_meta.archived_to_enotes };
       break;
     }
+    case 'confirm_preset': {
+      const it = findById(p.id);
+      if (!it) break;
+      it.source = 'user';
+      if (Array.isArray(it.tags)) it.tags = it.tags.filter((t) => t !== '预填');
+      it.verified_at = today;
+      hist = { ts: op.ts, op: 'confirm_preset', id: it.id };
+      break;
+    }
+    case 'restore_item': {
+      const it = findById(p.id);
+      if (!it) break;
+      it.status = (it.qty || 0) > 0 ? 'in_use' : 'used_up';
+      it.verified_at = today;
+      hist = { ts: op.ts, op: 'restore', id: it.id, name: it.name };
+      break;
+    }
     case 'retire_item': {
       const it = findById(p.id);
       if (!it) break;
@@ -760,6 +795,7 @@ export function getIdleRadar(items, today = todayISO()) {
   const idle = [];
   const unverified = [];
   for (const it of getActiveItems(items)) {
+    if (it.source === 'preset') continue;
     if ((it.qty || 0) <= 0) continue;
     if ((it.unopened_qty || 0) > 0 || it.status === 'unused') {
       unopened.push(it);
