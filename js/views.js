@@ -199,7 +199,7 @@ export function renderWelcomeStrip(store) {
   const userCount = active.length - presetCount;
 
   const h = new Date().getHours();
-  const greet = h < 11 ? '早安，物品各归其位' : (h < 18 ? '手边好物，井井有条' : '晚安，小仓灯火温暖');
+  const greet = h < 11 ? '晨光清透，万物各归其位' : (h < 18 ? '手边私藏，秩序井然' : '夜色流光，藏品一目了然');
 
   const pills = [];
   if (expCount > 0) pills.push(`<button class="calm-pill is-danger" data-act="nav" data-route="expiring">临期 ${expCount}</button>`);
@@ -347,7 +347,7 @@ export function renderSearchView(store, ui) {
       <div id="home-summary-slot">${renderWelcomeStrip(store)}</div>
       <div class="search-box">
         <span class="search-ic">${ICONS.search}</span>
-        <input id="search-input" type="search" placeholder="搜名称、别名、分类、地点或容器码…" value="${esc(q)}" autocomplete="off" />
+        <input id="search-input" type="search" placeholder="搜名称、别名、分类或容器码…" value="${esc(q)}" autocomplete="off" />
         <button id="search-clear" class="clear-btn" data-act="clear-search" aria-label="清空"${q ? '' : ' hidden'}>✕</button>
       </div>
       <div class="filter-group">
@@ -843,9 +843,9 @@ export function renderSettingsModal(store, theme = 'light') {
   const roUrl = buildTokenUrl(cfg.owner, true);
   const rwUrl = buildTokenUrl(cfg.owner, false);
   const themes = [
-    { id: 'light', label: '暖阳明亮', ic: ICONS.sun },
+    { id: 'light', label: '晨光琉璃', ic: ICONS.sun },
     { id: 'system', label: '跟随系统', ic: ICONS.auto },
-    { id: 'dark', label: '柔和夜灯', ic: ICONS.moon },
+    { id: 'dark', label: '曜石流光', ic: ICONS.moon },
   ];
   return `
     <div class="modal-backdrop" data-act="close-backdrop">
@@ -857,7 +857,7 @@ export function renderSettingsModal(store, theme = 'light') {
         <div class="theme-card">
           <div class="theme-card-head">
             <span class="theme-card-title">界面外观</span>
-            <span class="muted">默认暖阳明亮，不受系统深色模式影响</span>
+            <span class="muted">液态玻璃光学质感 · 默认晨光琉璃</span>
           </div>
           <div class="theme-seg">
             ${themes.map((t) => `

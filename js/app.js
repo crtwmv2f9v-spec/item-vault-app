@@ -61,7 +61,7 @@ function applyTheme(mode, persist = true) {
   ui.theme = clean;
   document.documentElement.dataset.theme = clean;
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', effectiveDark(clean) ? '#231f1c' : '#fcfaf6');
+  if (meta) meta.setAttribute('content', effectiveDark(clean) ? '#0b0f19' : '#f2f5fb');
   if (persist) {
     try { localStorage.setItem(THEME_KEY, clean); } catch { /* ignore */ }
   }
@@ -288,10 +288,10 @@ function render() {
     <header class="topbar">
       <div class="topbar-inner">
         <div class="brand">
-          <img class="brand-mark" src="icons/favicon.svg?v=2" alt="" width="32" height="32">
+          <img class="brand-mark" src="icons/favicon.svg?v=3" alt="" width="34" height="34">
           <div class="brand-text">
             <h1>物品库</h1>
-            <span class="brand-sub">暖光收纳小仓</span>
+            <span class="brand-sub">琉璃私藏</span>
           </div>
         </div>
         <div class="top-right">
@@ -408,7 +408,7 @@ document.addEventListener('click', async (e) => {
     document.querySelectorAll('.theme-opt').forEach((el) => {
       el.classList.toggle('active', el.dataset.theme === ui.theme);
     });
-    const labels = { light: '暖阳明亮', system: '跟随系统', dark: '柔和夜灯' };
+    const labels = { light: '晨光琉璃', system: '跟随系统', dark: '曜石流光' };
     toast(`已切换至「${labels[ui.theme] || ui.theme}」外观`);
   } else if (act === 'clear-search') {
     ui.searchQuery = '';
@@ -762,6 +762,28 @@ document.addEventListener('visibilitychange', () => {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
+
+// Subtle desktop specular glass sheen tracking (zero DOM mutation, mouse-only)
+let sheenRaf = 0;
+let sheenTarget = null;
+let sheenX = 0;
+let sheenY = 0;
+document.addEventListener('pointermove', (e) => {
+  if (e.pointerType !== 'mouse') return;
+  const card = e.target?.closest?.('.card, .domain-tile, .loc-tile, .welcome-strip');
+  if (!card) return;
+  sheenTarget = card;
+  sheenX = e.clientX;
+  sheenY = e.clientY;
+  if (sheenRaf) return;
+  sheenRaf = requestAnimationFrame(() => {
+    sheenRaf = 0;
+    if (!sheenTarget?.isConnected) return;
+    const rect = sheenTarget.getBoundingClientRect();
+    sheenTarget.style.setProperty('--mx', `${Math.round(sheenX - rect.left)}px`);
+    sheenTarget.style.setProperty('--my', `${Math.round(sheenY - rect.top)}px`);
+  });
+}, { passive: true });
 
 store.subscribe(() => {
   const modalInDom = Boolean(document.querySelector('.modal-backdrop'));
